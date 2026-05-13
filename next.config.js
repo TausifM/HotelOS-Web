@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
+  // REMOVE OR COMMENT OUT THIS LINE:
+  // output: 'standalone', 
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.amazonaws.com' },
