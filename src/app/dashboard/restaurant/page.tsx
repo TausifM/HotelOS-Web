@@ -149,11 +149,11 @@ export default function Index() {
   });
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
-const [selectedRoomId, setSelectedRoomId] = useState('');
-const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
-const [selectedGuest, setSelectedGuest] = useState<any>(null);
-const [selectedReservation, setSelectedReservation] = useState<any>(null);
-const [guestLoading, setGuestLoading] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState('');
+  const [selectedRoomNumber, setSelectedRoomNumber] = useState('');
+  const [selectedGuest, setSelectedGuest] = useState<any>(null);
+  const [selectedReservation, setSelectedReservation] = useState<any>(null);
+  const [guestLoading, setGuestLoading] = useState(false);
   async function downloadInvoice(orderId: string) {
     setDownloadingInvoice(true);
     try {
@@ -300,17 +300,17 @@ const [guestLoading, setGuestLoading] = useState(false);
 
   function placeOrder() {
     if (!selectedItems.length) return;
-const placeOrderMutation = useMutation({
-  mutationFn: (payload: {
-    items: { name: string; price: number; quantity: number }[];
-    orderType: "room_service" | "dine_in";
-    roomNumber?: string;
-    tableNumber?: string;
-    reservationId?: string;
-    guestId?: string;
-  }) => api.post("/api/restaurant/orders", payload),
-  })
-}
+    const placeOrderMutation = useMutation({
+      mutationFn: (payload: {
+        items: { name: string; price: number; quantity: number }[];
+        orderType: "room_service" | "dine_in";
+        roomNumber?: string;
+        tableNumber?: string;
+        reservationId?: string;
+        guestId?: string;
+      }) => api.post("/api/restaurant/orders", payload),
+    })
+  }
 
   function updateStatus(id: string, status: Order["status"]) {
     updateStatusMutation.mutate({ id, status });
@@ -344,55 +344,55 @@ const placeOrderMutation = useMutation({
       },
     });
   }
-const loadGuestByRoom = async (room: any) => {
-  if (!room) {
-    setSelectedGuest(null);
-    setSelectedReservation(null);
-    return;
-  }
-
-  setGuestLoading(true);
-
-  try {
-    const roomId = room._id || room.id;
-    const roomNo = String(room.number || '');
-
-    const res = await api.get('/api/reservations', {
-      params: {
-        status: 'checked_in',
-        roomId,
-        roomNumber: roomNo,
-        limit: 20,
-      },
-    });
-
-    const rows = res.data?.data?.docs || res.data?.data || [];
-
-    const booking = rows.find((item: any) => {
-      const itemRoomId =
-        item.roomId?._id || item.roomId || item.assignedRoomId || item.room?._id;
-      const itemRoomNo =
-        String(item.roomNumber || item.roomNo || item.room?.number || '');
-
-      return String(itemRoomId) === String(roomId) || itemRoomNo === roomNo;
-    });
-
-    if (booking) {
-      setSelectedGuest(booking.guestId || booking.guest || null);
-      setSelectedReservation(booking);
-    } else {
+  const loadGuestByRoom = async (room: any) => {
+    if (!room) {
       setSelectedGuest(null);
       setSelectedReservation(null);
-      toast.error('No checked-in guest found for this room');
+      return;
     }
-  } catch (e: any) {
-    setSelectedGuest(null);
-    setSelectedReservation(null);
-    toast.error(e?.response?.data?.message || 'Failed to load guest');
-  } finally {
-    setGuestLoading(false);
-  }
-};
+
+    setGuestLoading(true);
+
+    try {
+      const roomId = room._id || room.id;
+      const roomNo = String(room.number || '');
+
+      const res = await api.get('/api/reservations', {
+        params: {
+          status: 'checked_in',
+          roomId,
+          roomNumber: roomNo,
+          limit: 20,
+        },
+      });
+
+      const rows = res.data?.data?.docs || res.data?.data || [];
+
+      const booking = rows.find((item: any) => {
+        const itemRoomId =
+          item.roomId?._id || item.roomId || item.assignedRoomId || item.room?._id;
+        const itemRoomNo =
+          String(item.roomNumber || item.roomNo || item.room?.number || '');
+
+        return String(itemRoomId) === String(roomId) || itemRoomNo === roomNo;
+      });
+
+      if (booking) {
+        setSelectedGuest(booking.guestId || booking.guest || null);
+        setSelectedReservation(booking);
+      } else {
+        setSelectedGuest(null);
+        setSelectedReservation(null);
+        toast.error('No checked-in guest found for this room');
+      }
+    } catch (e: any) {
+      setSelectedGuest(null);
+      setSelectedReservation(null);
+      toast.error(e?.response?.data?.message || 'Failed to load guest');
+    } finally {
+      setGuestLoading(false);
+    }
+  };
   function addNewItem() {
     if (!formData.name.trim() || !formData.price) {
       toast.error("Name and price required");
@@ -509,55 +509,72 @@ const loadGuestByRoom = async (room: any) => {
           {completed.length > 0 && (
             <section className="mt-10">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-display text-2xl font-bold tracking-tight">Completed Today</h2>
+                <h2 className="font-display text-2xl font-bold tracking-tight">
+                  Completed Today
+                </h2>
                 <Badge className="rounded-full">{completed.length}</Badge>
               </div>
+
               <div className="overflow-hidden rounded-3xl bg-card shadow-card">
-                <table className="w-full text-sm">
-                  <thead className="bg-secondary/60 text-xs uppercase tracking-wider text-foreground">
-                    <tr>
-                      <th className="px-5 py-3 text-left">Items</th>
-                      <th className="px-5 py-3 text-left">Type</th>
-                      <th className="px-5 py-3 text-left">Location</th>
-                      <th className="px-5 py-3 text-right">Amount</th>
-                      <th className="px-5 py-3 text-left">Status</th>
-                      <th className="px-5 py-3 text-right">Invoice</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {completed.slice(0, 10).map(o => (
-                      <tr key={o._id} className="border-t border-border transition-smooth hover:bg-secondary/30">
-                        <td className="px-5 py-3">{o.items.map(i => `${i.quantity}× ${i.name}`).join(', ')}</td>
-                        <td className="px-5 py-3 capitalize">{o.orderType.replace('_', ' ')}</td>
-                        <td className="px-5 py-3">{o.roomNumber || o.tableNumber || '—'}</td>
-                        <td className="px-5 py-3 text-right font-semibold">₹{o.total}</td>
-                        <td className="px-5 py-3">
-                          <Badge
-                            variant={o.status === 'delivered' ? 'success' : 'warning'}
-                            className="rounded-full capitalize"
-                          >
-                            {o.status}
-                          </Badge>
-                        </td>
-                        <td className="px-5 py-3 text-right">
-                          {o.status === "delivered" && (
-                            <button
-                              onClick={() => setInvoiceOrder(o)}
-                              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
-                              style={{
-                                background: "linear-gradient(135deg,#F97316,#F43F5E)",
-                                color: "#fff",
-                              }}
-                            >
-                              <FileText className="h-3 w-3" />
-                              Invoice
-                            </button>
-                          )}
-                        </td>
+                <div className="w-full overflow-x-auto">
+                  <table className="min-w-[760px] w-full text-sm">
+                    <thead className="bg-secondary/60 text-xs uppercase tracking-wider text-foreground">
+                      <tr>
+                        <th className="px-5 py-3 text-left whitespace-nowrap">Items</th>
+                        <th className="px-5 py-3 text-left whitespace-nowrap">Type</th>
+                        <th className="px-5 py-3 text-left whitespace-nowrap">Location</th>
+                        <th className="px-5 py-3 text-right whitespace-nowrap">Amount</th>
+                        <th className="px-5 py-3 text-left whitespace-nowrap">Status</th>
+                        <th className="px-5 py-3 text-right whitespace-nowrap">Invoice</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+
+                    <tbody>
+                      {completed.slice(0, 10).map((o) => (
+                        <tr
+                          key={o._id}
+                          className="border-t border-border transition-smooth hover:bg-secondary/30"
+                        >
+                          <td className="px-5 py-3 whitespace-nowrap">
+                            {o.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}
+                          </td>
+                          <td className="px-5 py-3 capitalize whitespace-nowrap">
+                            {o.orderType.replace("_", " ")}
+                          </td>
+                          <td className="px-5 py-3 whitespace-nowrap">
+                            {o.roomNumber || o.tableNumber || "—"}
+                          </td>
+                          <td className="px-5 py-3 text-right font-semibold whitespace-nowrap">
+                            ₹{o.total}
+                          </td>
+                          <td className="px-5 py-3 whitespace-nowrap">
+                            <Badge
+                              variant={o.status === "delivered" ? "success" : "warning"}
+                              className="rounded-full capitalize"
+                            >
+                              {o.status}
+                            </Badge>
+                          </td>
+                          <td className="px-5 py-3 text-right whitespace-nowrap">
+                            {o.status === "delivered" && (
+                              <button
+                                onClick={() => setInvoiceOrder(o)}
+                                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+                                style={{
+                                  background: "linear-gradient(135deg,#F97316,#F43F5E)",
+                                  color: "#fff",
+                                }}
+                              >
+                                <FileText className="h-3 w-3" />
+                                Invoice
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </section>
           )}
@@ -636,20 +653,20 @@ const loadGuestByRoom = async (room: any) => {
 
                         <select
                           value={selectedRoomId}
-                         onChange={async (e) => {
-  const roomId = e.target.value;
-  setSelectedRoomId(roomId);
+                          onChange={async (e) => {
+                            const roomId = e.target.value;
+                            setSelectedRoomId(roomId);
 
-  const room = rooms.find((r: any) => (r._id || r.id) === roomId);
-  setSelectedRoomNumber(room?.number || '');
+                            const room = rooms.find((r: any) => (r._id || r.id) === roomId);
+                            setSelectedRoomNumber(room?.number || '');
 
-  setSelectedGuest(null);
-  setSelectedReservation(null);
+                            setSelectedGuest(null);
+                            setSelectedReservation(null);
 
-  if (room) {
-    await loadGuestByRoom(room);
-  }
-}}
+                            if (room) {
+                              await loadGuestByRoom(room);
+                            }
+                          }}
                           disabled={roomsLoading}
                           className="
             h-11 w-full appearance-none rounded-xl border border-input bg-background

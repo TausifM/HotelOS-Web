@@ -111,7 +111,8 @@ export const landingPages: Record<string, LandingPageConfig> = {
     heroTitle: "India's Most Trusted Cloud Hotel PMS",
     heroSubtitle:
       "Manage reservations, front desk, housekeeping & night audit from any device. Built for Indian hotels, resorts & guest houses.",
-    problemTitle: "Still managing your hotel with spreadsheets and diary books?",
+    problemTitle:
+      "Still managing your hotel with spreadsheets and diary books?",
     problemPoints: [
       "Double bookings from manual entry errors",
       "No real-time view of room availability",
@@ -151,9 +152,20 @@ export const landingPages: Record<string, LandingPageConfig> = {
       },
     ],
     howItWorksSteps: [
-      { title: "Sign up in 2 minutes", description: "Create your hotel profile and add your rooms." },
-      { title: "Import your bookings", description: "Migrate from any existing system with our free onboarding." },
-      { title: "Go live", description: "Start managing reservations, front desk, and billing from one dashboard." },
+      {
+        title: "Sign up in 2 minutes",
+        description: "Create your hotel profile and add your rooms.",
+      },
+      {
+        title: "Import your bookings",
+        description:
+          "Migrate from any existing system with our free onboarding.",
+      },
+      {
+        title: "Go live",
+        description:
+          "Start managing reservations, front desk, and billing from one dashboard.",
+      },
     ],
     stats: [
       { label: "Hotels using HoteloS", value: "12,000+" },
@@ -317,11 +329,19 @@ export const landingPages: Record<string, LandingPageConfig> = {
       },
     ],
     howItWorksSteps: [
-      { title: "Connect your OTAs", description: "Link Booking.com, MakeMyTrip, Goibibo, Agoda & more in one click." },
-      { title: "Set your rules", description: "Define rate parity, markups, and stop-sell thresholds." },
+      {
+        title: "Connect your OTAs",
+        description:
+          "Link Booking.com, MakeMyTrip, Goibibo, Agoda & more in one click.",
+      },
+      {
+        title: "Set your rules",
+        description: "Define rate parity, markups, and stop-sell thresholds.",
+      },
       {
         title: "Auto-sync 24/7",
-        description: "HoteloS updates inventory and rates across all channels every 30 seconds.",
+        description:
+          "HoteloS updates inventory and rates across all channels every 30 seconds.",
       },
     ],
     stats: [
@@ -456,7 +476,8 @@ export const landingPages: Record<string, LandingPageConfig> = {
     heroTitle: "GST Billing Software Built for Indian Hotels",
     heroSubtitle:
       "Auto-calculate GST, generate e-invoices, file GSTR-1/GSTR-3B reports & integrate POS billing. Tax compliance made effortless.",
-    problemTitle: "Spending hours on GST calculations and tax filing every month?",
+    problemTitle:
+      "Spending hours on GST calculations and tax filing every month?",
     problemPoints: [
       "Manual GST calculation errors on every invoice",
       "Missing GSTR-1 and GSTR-3B deadlines",
@@ -496,9 +517,20 @@ export const landingPages: Record<string, LandingPageConfig> = {
       },
     ],
     howItWorksSteps: [
-      { title: "Enable GST profile", description: "Set your GSTIN, HSN codes, and tax rates once." },
-      { title: "Bill automatically", description: "Every invoice auto-calculates GST with correct rates and codes." },
-      { title: "File in one click", description: "Export GSTR-1 and GSTR-3B reports ready for GST portal upload." },
+      {
+        title: "Enable GST profile",
+        description: "Set your GSTIN, HSN codes, and tax rates once.",
+      },
+      {
+        title: "Bill automatically",
+        description:
+          "Every invoice auto-calculates GST with correct rates and codes.",
+      },
+      {
+        title: "File in one click",
+        description:
+          "Export GSTR-1 and GSTR-3B reports ready for GST portal upload.",
+      },
     ],
     stats: [
       { label: "GST invoices generated", value: "5M+" },
@@ -695,9 +727,21 @@ export const landingPages: Record<string, LandingPageConfig> = {
       },
     ],
     howItWorksSteps: [
-      { title: "Connect your data", description: "HoteloS ingests your booking history, competitor rates, and local events." },
-      { title: "Get AI recommendations", description: "Receive optimal rate suggestions updated multiple times per day." },
-      { title: "Apply with one click", description: "Accept AI rates or set auto-pilot mode for hands-free revenue optimization." },
+      {
+        title: "Connect your data",
+        description:
+          "HoteloS ingests your booking history, competitor rates, and local events.",
+      },
+      {
+        title: "Get AI recommendations",
+        description:
+          "Receive optimal rate suggestions updated multiple times per day.",
+      },
+      {
+        title: "Apply with one click",
+        description:
+          "Accept AI rates or set auto-pilot mode for hands-free revenue optimization.",
+      },
     ],
     stats: [
       { label: "Average RevPAR increase", value: "18-24%" },
@@ -890,9 +934,21 @@ export const landingPages: Record<string, LandingPageConfig> = {
       },
     ],
     howItWorksSteps: [
-      { title: "Connect WhatsApp Business API", description: "Verify your business profile and link your WhatsApp number." },
-      { title: "Set message templates", description: "Configure booking confirmations, check-in links, and review requests." },
-      { title: "Automate 24/7", description: "Guests receive instant responses and updates without front desk intervention." },
+      {
+        title: "Connect WhatsApp Business API",
+        description:
+          "Verify your business profile and link your WhatsApp number.",
+      },
+      {
+        title: "Set message templates",
+        description:
+          "Configure booking confirmations, check-in links, and review requests.",
+      },
+      {
+        title: "Automate 24/7",
+        description:
+          "Guests receive instant responses and updates without front desk intervention.",
+      },
     ],
     stats: [
       { label: "WhatsApp open rate", value: "98%" },
@@ -1082,9 +1138,19 @@ export const landingPages: Record<string, LandingPageConfig> = {
       },
     ],
     howItWorksSteps: [
-      { title: "Get your embed code", description: "Copy one line of code from HoteloS dashboard." },
-      { title: "Paste on your website", description: "Works with WordPress, Wix, custom HTML, or any builder." },
-      { title: "Start taking direct bookings", description: "Guests book and pay instantly. Money lands in your account directly." },
+      {
+        title: "Get your embed code",
+        description: "Copy one line of code from HoteloS dashboard.",
+      },
+      {
+        title: "Paste on your website",
+        description: "Works with WordPress, Wix, custom HTML, or any builder.",
+      },
+      {
+        title: "Start taking direct bookings",
+        description:
+          "Guests book and pay instantly. Money lands in your account directly.",
+      },
     ],
     stats: [
       { label: "Commission on direct bookings", value: "0%" },
@@ -1316,7 +1382,8 @@ export const landingPages: Record<string, LandingPageConfig> = {
     heroTitle: "Hotel Software That Fits Small Budgets",
     heroSubtitle:
       "Full PMS, channel manager, GST billing & WhatsApp automation for small hotels, guest houses & budget properties. From ₹1,500/month.",
-    problemTitle: "Big hotel software is too expensive and too complex for your property?",
+    problemTitle:
+      "Big hotel software is too expensive and too complex for your property?",
     problemPoints: [
       "Enterprise PMS costs ₹10,000+/month with features you never use",
       "Complex setup requiring IT consultants",
@@ -1356,9 +1423,21 @@ export const landingPages: Record<string, LandingPageConfig> = {
       },
     ],
     howItWorksSteps: [
-      { title: "Sign up online", description: "Create your account in 2 minutes. No paperwork or site visits." },
-      { title: "Add your rooms", description: "Enter room types, rates, and photos. Our team helps if needed." },
-      { title: "Go live today", description: "Start taking bookings from your website and OTAs within hours." },
+      {
+        title: "Sign up online",
+        description:
+          "Create your account in 2 minutes. No paperwork or site visits.",
+      },
+      {
+        title: "Add your rooms",
+        description:
+          "Enter room types, rates, and photos. Our team helps if needed.",
+      },
+      {
+        title: "Go live today",
+        description:
+          "Start taking bookings from your website and OTAs within hours.",
+      },
     ],
     stats: [
       { label: "Small hotels onboarded", value: "5,000+" },
@@ -1397,8 +1476,293 @@ export const landingPages: Record<string, LandingPageConfig> = {
     ctaSubtitle:
       "Join 12,000+ hotels using HoteloS. Free 120-days trial. No credit card. Cancel anytime.",
   },
-
-  "resorts": {
+  "small-hotel": {
+    slug: "small-hotels",
+    title: "Small Hotel Software India | Budget PMS from ₹1,500 — HoteloS",
+    description:
+      "Affordable hotel management software for small hotels, guest houses & budget properties. Full PMS, channel manager, GST billing & WhatsApp from ₹1,500/month.",
+    keywords: [
+      "small hotel software India",
+      "budget hotel management system",
+      "affordable hotel PMS",
+      "small hotel PMS India",
+      "budget hotel software",
+      "small property management system",
+      "hotel software for 10 rooms",
+      "hotel software for 20 rooms",
+      "guest house software India",
+      "lodge management software",
+      "homestay software India",
+      "budget hotel billing software",
+      "cheap hotel PMS India",
+      "hotel software low price",
+      "small hotel booking system",
+      "hotel management app India",
+      "best PMS for small hotels",
+      "HoteloS small hotels",
+      "small hotel",
+      "budget hotel",
+      "cheap hotel",
+      "mini hotel",
+      "small hotel app",
+      "small hotel software",
+      "small hotel system",
+      "budget hotel app",
+      "budget hotel software",
+      "budget hotel system",
+      "cheap hotel app",
+      "cheap hotel software",
+      "cheap hotel system",
+      "mini hotel app",
+      "mini hotel software",
+      "mini hotel system",
+      "small hotel India",
+      "budget hotel India",
+      "cheap hotel India",
+      "mini hotel India",
+      "small hotel price",
+      "small hotel cost",
+      "small hotel demo",
+      "small hotel trial",
+      "small hotel free",
+      "budget hotel price",
+      "budget hotel cost",
+      "budget hotel demo",
+      "budget hotel trial",
+      "budget hotel free",
+      "cheap hotel price",
+      "cheap hotel cost",
+      "cheap hotel demo",
+      "cheap hotel trial",
+      "cheap hotel free",
+      "mini hotel price",
+      "mini hotel cost",
+      "mini hotel demo",
+      "mini hotel trial",
+      "mini hotel free",
+      "small hotel login",
+      "small hotel signup",
+      "small hotel dashboard",
+      "small hotel panel",
+      "small hotel portal",
+      "small hotel tool",
+      "small hotel solution",
+      "small hotel platform",
+      "small hotel company",
+      "small hotel provider",
+      "small hotel vendor",
+      "budget hotel login",
+      "budget hotel signup",
+      "budget hotel dashboard",
+      "budget hotel panel",
+      "budget hotel portal",
+      "budget hotel tool",
+      "budget hotel solution",
+      "budget hotel platform",
+      "budget hotel company",
+      "budget hotel provider",
+      "budget hotel vendor",
+      "cheap hotel login",
+      "cheap hotel signup",
+      "cheap hotel dashboard",
+      "cheap hotel panel",
+      "cheap hotel portal",
+      "cheap hotel tool",
+      "cheap hotel solution",
+      "cheap hotel platform",
+      "cheap hotel company",
+      "cheap hotel provider",
+      "cheap hotel vendor",
+      "mini hotel login",
+      "mini hotel signup",
+      "mini hotel dashboard",
+      "mini hotel panel",
+      "mini hotel portal",
+      "mini hotel tool",
+      "mini hotel solution",
+      "mini hotel platform",
+      "mini hotel company",
+      "mini hotel provider",
+      "mini hotel vendor",
+      "small property",
+      "small property app",
+      "small property software",
+      "small property system",
+      "small property India",
+      "small property price",
+      "small property cost",
+      "small property demo",
+      "small property trial",
+      "small property free",
+      "small property login",
+      "small property signup",
+      "small property dashboard",
+      "small property panel",
+      "small property portal",
+      "small property tool",
+      "small property solution",
+      "small property platform",
+      "small property company",
+      "small property provider",
+      "small property vendor",
+      "couple hotel",
+      "couple friendly hotel",
+      "couple room",
+      "couple friendly room",
+      "unmarried couple hotel",
+      "unmarried couple room",
+      "boyfriend girlfriend hotel",
+      "bf gf hotel",
+      "boyfriend girlfriend room",
+      "bf gf room",
+      "couple stay",
+      "couple allowed",
+      "cheap couple hotel",
+      "low budget couple hotel",
+      "budget couple room",
+      "cheap couple room",
+      "affordable couple hotel",
+      "couple hotel under 500",
+      "couple hotel under 1000",
+      "couple room 500",
+      "couple room 1000",
+      "couple hotel offer",
+      "couple hotel deal",
+      "couple hotel hourly",
+      "couple room hourly",
+      "couple hotel 3 hours",
+      "couple hotel 6 hours",
+      "couple hotel 12 hours",
+      "couple hotel day use",
+      "couple hotel short stay",
+      "private couple hotel",
+      "safe couple hotel",
+      "secure couple hotel",
+      "couple hotel no questions",
+      "couple hotel no judgement",
+      "couple hotel privacy",
+      "couple hotel local id",
+      "couple hotel local id accepted",
+      "couple hotel same city id",
+      "couple hotel aadhar accepted",
+      "unmarried couple allowed",
+      "unmarried couple welcome",
+      "unmarried couple accepted",
+      "dating couple hotel",
+      "young couple hotel",
+      "boyfriend hotel",
+      "girlfriend hotel",
+      "partner hotel",
+      "couple hotel near me",
+      "couple hotel nearby",
+      "couple hotel Nagpur",
+      "couple hotel Mumbai",
+      "couple hotel Pune",
+      "couple hotel Hyderabad",
+      "couple hotel Goa",
+    ],
+    canonical: "https://hotelos.online/small-hotels",
+    ogTitle: "Small Hotel Software India | Budget PMS from ₹1,500 — HoteloS",
+    ogDescription:
+      "Full PMS, channel manager, GST billing & WhatsApp automation for small hotels. Plans from ₹1,500/month.",
+    heroTitle: "Hotel Software That Fits Small Budgets",
+    heroSubtitle:
+      "Full PMS, channel manager, GST billing & WhatsApp automation for small hotels, guest houses & budget properties. From ₹1,500/month.",
+    problemTitle:
+      "Big hotel software is too expensive and too complex for your property?",
+    problemPoints: [
+      "Enterprise PMS costs ₹10,000+/month with features you never use",
+      "Complex setup requiring IT consultants",
+      "No GST support built for Indian small properties",
+      "Missing OTA connections because channel managers cost extra",
+    ],
+    features: [
+      {
+        title: "All-in-One PMS",
+        description:
+          "Reservations, front desk, housekeeping, billing, and reporting in one simple dashboard. No multiple subscriptions.",
+      },
+      {
+        title: "Channel Manager Included",
+        description:
+          "Sync with Booking.com, MakeMyTrip, and Goibibo at no extra cost. Same features big chains pay thousands for.",
+      },
+      {
+        title: "GST Billing Made Simple",
+        description:
+          "Auto-calculate GST, generate invoices, and file reports without hiring an accountant. Built for Indian tax rules.",
+      },
+      {
+        title: "WhatsApp Guest Communication",
+        description:
+          "Send confirmations, collect reviews, and answer guest queries on WhatsApp — the app every Indian uses.",
+      },
+      {
+        title: "Mobile-First Design",
+        description:
+          "Run your entire hotel from your smartphone. Perfect for owner-operators who are always on the move.",
+      },
+      {
+        title: "24/7 Support in Hindi & English",
+        description:
+          "Get help anytime via phone, WhatsApp, or email. Our India-based team understands small hotel challenges.",
+      },
+    ],
+    howItWorksSteps: [
+      {
+        title: "Sign up online",
+        description:
+          "Create your account in 2 minutes. No paperwork or site visits.",
+      },
+      {
+        title: "Add your rooms",
+        description:
+          "Enter room types, rates, and photos. Our team helps if needed.",
+      },
+      {
+        title: "Go live today",
+        description:
+          "Start taking bookings from your website and OTAs within hours.",
+      },
+    ],
+    stats: [
+      { label: "Small hotels onboarded", value: "5,000+" },
+      { label: "Starting price", value: "₹1,500/mo" },
+      { label: "Setup time", value: "Under 1 hr" },
+      { label: "Support languages", value: "Hindi + English" },
+    ],
+    faqs: [
+      {
+        question: "Is HoteloS suitable for small hotels with 5-20 rooms?",
+        answer:
+          "Absolutely. HoteloS is designed for hotels of all sizes. Our starter plan at ₹1,500/month is perfect for small hotels, guest houses, and homestays.",
+      },
+      {
+        question: "Do I need technical knowledge to use HoteloS?",
+        answer:
+          "No. HoteloS is built for non-technical hotel owners. Setup takes under 30 minutes and our team provides free training.",
+      },
+      {
+        question: "Can a small hotel afford a channel manager?",
+        answer:
+          "Yes. HoteloS includes channel manager, booking engine, and PMS in one affordable plan. No separate subscriptions needed.",
+      },
+      {
+        question: "Is there a free trial?",
+        answer:
+          "Yes. Every small hotel gets a 120-days free trial with full access to all features. No credit card required.",
+      },
+      {
+        question: "Can I upgrade as my hotel grows?",
+        answer:
+          "Yes. HoteloS scales with you. Upgrade anytime for more rooms, properties, or advanced features like AI pricing.",
+      },
+    ],
+    ctaTitle: "Start Running Your Hotel Like a Pro",
+    ctaSubtitle:
+      "Join 12,000+ hotels using HoteloS. Free 120-days trial. No credit card. Cancel anytime.",
+  },
+  resorts: {
     slug: "resorts",
     title: "Resort Management Software India | Spa, F&B & Activities — HoteloS",
     description:
@@ -1468,13 +1832,15 @@ export const landingPages: Record<string, LandingPageConfig> = {
       "resort software vendor",
     ],
     canonical: "https://hotelos.online/resorts",
-    ogTitle: "Resort Management Software India | Spa, F&B & Activities — HoteloS",
+    ogTitle:
+      "Resort Management Software India | Spa, F&B & Activities — HoteloS",
     ogDescription:
       "Villa tracking, spa scheduling, F&B POS & activity booking. Resort management built for Indian hospitality.",
     heroTitle: "Resort Management Software Built for India",
     heroSubtitle:
       "Manage villas, spas, restaurants, activities & events from one platform. Designed for beach resorts, hill stations & destination properties.",
-    problemTitle: "Running a resort with separate systems for rooms, spa, restaurant, and activities?",
+    problemTitle:
+      "Running a resort with separate systems for rooms, spa, restaurant, and activities?",
     problemPoints: [
       "Guest bookings scattered across villa, spa, and restaurant diaries",
       "No unified guest profile across all resort touchpoints",
@@ -1514,9 +1880,21 @@ export const landingPages: Record<string, LandingPageConfig> = {
       },
     ],
     howItWorksSteps: [
-      { title: "Map your resort", description: "Configure villas, spa rooms, restaurants, and activity centers." },
-      { title: "Connect all outlets", description: "Link F&B, spa, and activity bookings to guest folios automatically." },
-      { title: "Optimize revenue", description: "Use analytics to fill spa gaps, promote activities, and upsell villa upgrades." },
+      {
+        title: "Map your resort",
+        description:
+          "Configure villas, spa rooms, restaurants, and activity centers.",
+      },
+      {
+        title: "Connect all outlets",
+        description:
+          "Link F&B, spa, and activity bookings to guest folios automatically.",
+      },
+      {
+        title: "Optimize revenue",
+        description:
+          "Use analytics to fill spa gaps, promote activities, and upsell villa upgrades.",
+      },
     ],
     stats: [
       { label: "Resorts using HoteloS", value: "500+" },
@@ -1526,7 +1904,8 @@ export const landingPages: Record<string, LandingPageConfig> = {
     ],
     faqs: [
       {
-        question: "Can HoteloS manage villas and cottages separately from hotel rooms?",
+        question:
+          "Can HoteloS manage villas and cottages separately from hotel rooms?",
         answer:
           "Yes. HoteloS supports mixed inventory types — rooms, villas, cottages, suites, and tents — each with unique rates, amenities, and housekeeping schedules.",
       },
@@ -1632,7 +2011,8 @@ export const landingPages: Record<string, LandingPageConfig> = {
     heroTitle: "Software Built for Guest Houses & Lodges",
     heroSubtitle:
       "Simple, affordable PMS with GST billing, OTA connectivity & WhatsApp for guest houses, lodges, dharamshalas & service apartments.",
-    problemTitle: "Running your guest house with diary books and WhatsApp notes?",
+    problemTitle:
+      "Running your guest house with diary books and WhatsApp notes?",
     problemPoints: [
       "No organized way to track monthly vs. daily guest billing",
       "Missing GST invoices for corporate and long-stay guests",
@@ -1672,9 +2052,20 @@ export const landingPages: Record<string, LandingPageConfig> = {
       },
     ],
     howItWorksSteps: [
-      { title: "Create your property", description: "Add room types, rates, and photos in under 10 minutes." },
-      { title: "Connect OTAs", description: "Start receiving online bookings from Booking.com and MakeMyTrip automatically." },
-      { title: "Manage from your phone", description: "Check bookings, send invoices, and message guests from anywhere." },
+      {
+        title: "Create your property",
+        description: "Add room types, rates, and photos in under 10 minutes.",
+      },
+      {
+        title: "Connect OTAs",
+        description:
+          "Start receiving online bookings from Booking.com and MakeMyTrip automatically.",
+      },
+      {
+        title: "Manage from your phone",
+        description:
+          "Check bookings, send invoices, and message guests from anywhere.",
+      },
     ],
     stats: [
       { label: "Guest houses onboarded", value: "3,000+" },
@@ -1684,7 +2075,8 @@ export const landingPages: Record<string, LandingPageConfig> = {
     ],
     faqs: [
       {
-        question: "Is HoteloS suitable for a small guest house with 5-10 rooms?",
+        question:
+          "Is HoteloS suitable for a small guest house with 5-10 rooms?",
         answer:
           "Yes. HoteloS is perfect for guest houses, lodges, and homestays. Our simple interface and affordable pricing make it ideal for small properties.",
       },

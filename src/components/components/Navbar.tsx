@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Zap } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const navLinks = [
   { label: "Home", href: "#home" },
@@ -35,14 +36,23 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="#home" className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 bg-[#EA580C] rounded-lg flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white fill-white" />
-            </div>
-            <span className="text-xl font-black tracking-wide text-[#111827] uppercase">
-              HoteloS
-            </span>
-          </Link>
+ <Link href="/home" className="flex items-center shrink-0">
+  <Image
+    src="/logo.png"
+    alt="HotelOS"
+    width={320}
+    height={90}
+    priority
+    className="
+      h-14 
+      md:h-16 
+      w-auto 
+      object-contain
+      transition-transform duration-300
+      hover:scale-[1.02]
+    "
+  />
+</Link>
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6">

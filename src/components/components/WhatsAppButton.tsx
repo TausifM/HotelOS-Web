@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/auth.store";
+import api from "@/lib/api";
 
 const WA_LINK = "https://wa.me/919975767561";
 
@@ -14,25 +17,82 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
+export function useAuth() {
+  const store = useAuthStore();
+  const router = useRouter();
+
+  const logout = useCallback(async () => {
+    try {
+      await api.post("/api/auth/logout");
+    } catch {}
+    store.logout();
+    router.replace("/auth/login");
+  }, [store, router]);
+
+  const hasPermission = useCallback(
+    (permission: string): boolean => {
+      if (!store.staff) return false;
+      if (store.staff.role === "owner" || store.staff.role === "superadmin") return true;
+      const perms = store.staff.permissions;
+      if (perms.includes("*")) return true;
+      const [resource] = permission.split(".");
+      return perms.includes(permission) || perms.includes(`${resource}.*`);
+    },
+    [store.staff]
+  );
+
+  const hasRole = useCallback(
+    (...roles: string[]): boolean => {
+      return store.staff ? roles.includes(store.staff.role) : false;
+    },
+    [store.staff]
+  );
+
+  return {
+    staff: store.staff,
+    tenant: store.tenant,
+    isAuthenticated: store.isAuthenticated,
+    isSuperAdmin: store.isSuperAdmin,
+    accessToken: store.accessToken,
+    logout,
+    hasPermission,
+    hasRole,
+  };
+}
+
 export default function WhatsAppButton() {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [showMobileBar, setShowMobileBar] = useState(false);
   const [pastHero, setPastHero] = useState(false);
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY;
       setPastHero(scrollY > window.innerHeight * 0.8);
     };
+
+    handleScroll();
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const handleWhatsAppClick = (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    if (!isAuthenticated) {
+      e.preventDefault();
+      router.push(`/auth/login?returnUrl=${encodeURIComponent(pathname || "/")}`);
+      return;
+    }
+
+    window.open(WA_LINK, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <>
-      {/* WhatsApp Floating Button */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
-        {/* Tooltip */}
         <AnimatePresence>
           {showTooltip && (
             <motion.div
@@ -40,20 +100,18 @@ export default function WhatsAppButton() {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 10, scale: 0.9 }}
               transition={{ duration: 0.15 }}
-              className="bg-[#111827] text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap"
+              className="relative bg-[#111827] text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap"
             >
-              Chat with us on WhatsApp
+              {isAuthenticated ? "Chat with us on WhatsApp" : "Login to chat on WhatsApp"}
               <div className="absolute right-3 -bottom-1.5 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-[#111827]" />
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Button */}
-        <motion.a
-          href={WA_LINK}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Chat with us on WhatsApp"
+        <motion.button
+          type="button"
+          aria-label={isAuthenticated ? "Chat with us on WhatsApp" : "Login to chat on WhatsApp"}
+          onClick={handleWhatsAppClick}
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
           initial={{ scale: 0, opacity: 0 }}
@@ -64,10 +122,9 @@ export default function WhatsAppButton() {
           className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center shadow-xl shadow-green-500/40 whatsapp-pulse"
         >
           <WhatsAppIcon className="w-8 h-8 text-white" />
-        </motion.a>
+        </motion.button>
       </div>
 
-      {/* Mobile sticky CTA bar */}
       <AnimatePresence>
         {pastHero && (
           <motion.div
@@ -83,14 +140,15 @@ export default function WhatsAppButton() {
             >
               Start Free Trial — 120 din free
             </Link>
-            {/* <a
-              href={WA_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
+
+            <button
+              type="button"
+              onClick={handleWhatsAppClick}
+              aria-label={isAuthenticated ? "Chat with us on WhatsApp" : "Login to chat on WhatsApp"}
               className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center shrink-0"
             >
               <WhatsAppIcon className="w-6 h-6 text-white" />
-            </a> */}
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

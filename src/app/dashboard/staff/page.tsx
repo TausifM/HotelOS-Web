@@ -472,20 +472,42 @@ function StatCard({
   gradient: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-white/60 bg-white/70 p-5 shadow-[0_18px_50px_-24px_rgba(255,92,130,0.55)] backdrop-blur">
-      <div className={cn('absolute inset-0 opacity-15 bg-gradient-to-br', gradient)} />
-      <div className="relative flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-black tracking-tight text-slate-900">{value}</p>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-2xl sm:rounded-3xl",
+        "border border-white/60 bg-white/70",
+        "p-4 sm:p-5 lg:p-6",
+        "shadow-[0_12px_40px_-20px_rgba(255,92,130,0.45)]",
+        "sm:shadow-[0_18px_50px_-24px_rgba(255,92,130,0.55)]",
+        "backdrop-blur-xl transition-transform duration-300 hover:scale-[1.02]"
+      )}
+    >
+      {/* Gradient background wash */}
+      <div className={cn("absolute inset-0 opacity-15 bg-gradient-to-br", gradient)} />
+
+      <div className="relative flex items-start justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] sm:tracking-[0.24em] text-slate-500">
+            {label}
+          </p>
+          <p className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-slate-900">
+            {value}
+          </p>
         </div>
-        <div className={cn('rounded-2xl bg-gradient-to-br p-3 text-white shadow-lg', gradient)}>
-          <Icon className="h-5 w-5" />
+
+        <div
+          className={cn(
+            "shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br p-2 sm:p-3 lg:p-3.5 text-white shadow-lg",
+            gradient
+          )}
+        >
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
         </div>
       </div>
     </div>
   );
 }
+
 
 function Field({
   label,
