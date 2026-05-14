@@ -1,18 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // REMOVE OR COMMENT OUT THIS LINE:
-  // output: 'standalone', 
+  output: 'standalone',
+
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '*.amazonaws.com' },
+      {
+        protocol: 'https',
+        hostname: '*.amazonaws.com',
+      },
     ],
   },
+
   async rewrites() {
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
+        destination: `${apiUrl}/api/:path*`,
       },
     ];
   },

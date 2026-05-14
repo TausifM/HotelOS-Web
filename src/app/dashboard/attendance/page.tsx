@@ -6,7 +6,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Spinner } from '@/components/ui';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
-import {QRCodeSVG} from "qrcode.react"
+import { QRCodeSVG } from "qrcode.react"
 import {
   QrCode,
   Download,
@@ -515,7 +515,10 @@ export default function AttendancePage() {
                     />
                   ) : (
                     <div className="w-60 h-60 sm:w-64 sm:h-64 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center shadow-lg animate-pulse ring-2 ring-white/50">
-                      <QRCodeSVG token={qrModal.token} className="text-gray-400" />
+                      <QRCodeSVG
+                        value={qrModal.token}
+                        className="text-gray-400"
+                      />
                     </div>
                   )}
                 </div>

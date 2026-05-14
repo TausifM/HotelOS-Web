@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -1320,7 +1320,7 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
   );
 }
 
-export default function BillingPage() {
+function BillingContent() {
   const searchParams = useSearchParams();
   const [selectedFolioId, setSelectedFolioId] = useState<string | null>(searchParams.get('folioId'));
   const [showRecon, setShowRecon] = useState(false);
@@ -1410,5 +1410,13 @@ export default function BillingPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <BillingContent />
+    </Suspense>
   );
 }
