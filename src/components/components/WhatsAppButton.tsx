@@ -135,7 +135,7 @@ export default function WhatsAppButton() {
             className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#EA580C] px-4 py-3 flex items-center gap-3 shadow-2xl"
           >
             <Link
-              href="/register"
+              href="/auth/register"
               className="flex-1 py-3 rounded-xl bg-white text-[#EA580C] font-black text-center text-sm active:scale-95 transition-transform"
             >
               Start Free Trial — 120 din free

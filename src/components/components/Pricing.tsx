@@ -13,7 +13,7 @@ const plans = [
     rooms: "Up to 20 rooms",
     popular: false,
     cta: "Start Free Trial",
-    ctaHref: "/register",
+    ctaHref: "/auth/register",
     features: [
       "All core modules",
       "WhatsApp notifications",
@@ -30,7 +30,7 @@ const plans = [
     rooms: "Up to 50 rooms",
     popular: true,
     cta: "Start Free Trial",
-    ctaHref: "/register",
+    ctaHref: "/auth/register",
     features: [
       "Everything in Starter",
       "AI Revenue Intelligence",
@@ -48,7 +48,7 @@ const plans = [
     rooms: "Unlimited rooms",
     popular: false,
     cta: "Start Free Trial",
-    ctaHref: "/register",
+    ctaHref: "/auth/register",
     features: [
       "Everything in Growth",
       "White-label branding",

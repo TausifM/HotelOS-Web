@@ -101,7 +101,7 @@ export default function Hero() {
               className="flex flex-wrap gap-4 mb-10"
             >
               <Link
-                href="/register"
+                href="/auth/register"
                 className="flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#EA580C] text-white font-bold text-base hover:bg-orange-700 transition-all hover:shadow-lg hover:shadow-orange-200 active:scale-95"
               >
                 Start 4-Month Free Trial

@@ -35,7 +35,7 @@ export default function CTABanner() {
           </p>
 
           <Link
-            href="/register"
+            href="/auth/register"
             className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-white text-[#EA580C] font-black text-lg hover:bg-gray-50 transition-all shadow-xl hover:shadow-2xl active:scale-95"
           >
             Start Free Trial
@@ -43,7 +43,7 @@ export default function CTABanner() {
           </Link>
 
           <p className="mt-4 text-white/60 text-sm">
-            hotelos.online/register
+            hotelos.online/auth/register
           </p>
         </motion.div>
       </div>
