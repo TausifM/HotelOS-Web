@@ -14,7 +14,7 @@ import {
 import { StatCard } from "@/components/restaurant/StatCard";
 import { OrderCard, type Order } from "@/components/restaurant/OrderCard";
 import { MenuItemCard } from "@/components/restaurant/MenuCard";
-import { CATEGORY_META, PRESET_ITEMS, type MenuItem } from "@/app/data/menuPresets";
+import { CATEGORY_META, PRESET_ITEMS, type MenuItem } from "@/pages/data/menuPresets";
 import { cn } from "@/lib/utils";
 import { Button, VisuallyHidden } from "@/components/ui";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";

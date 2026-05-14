@@ -1,4 +1,4 @@
-import { MenuItem } from "@/app/data/menuPresets";
+import { MenuItem } from "@/pages/data/menuPresets";
 import { cn } from "@/lib/utils";
 import { Clock, Plus, Minus } from "lucide-react";
 
