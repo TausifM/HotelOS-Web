@@ -169,9 +169,12 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+
     try {
       await api.post('/api/auth/register', form);
       setSuccess(true);
+       toast.success('Login successful');
+       router.replace('/dashboard');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Registration failed');
     } finally {
