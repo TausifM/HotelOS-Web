@@ -71,7 +71,7 @@ export default function Navbar() {
               WhatsApp
             </a>
             <Link
-              href="/register"
+              href="/auth/register"
               className="px-4 py-2 rounded-lg bg-[#EA580C] text-white text-sm font-semibold hover:bg-orange-700 transition-colors"
             >
               Start Free Trial

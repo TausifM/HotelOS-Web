@@ -95,8 +95,8 @@ export default function Pricing() {
             Simple pricing.{" "}
             <span className="text-[#EA580C]">No surprises.</span>
           </h2>
-          <p className="mt-3 text-gray-500 text-lg">
-            120-day free trial — no credit card required.
+          <p className="mt-3 text-green-500 text-xl">
+            <strong>120-day free trial</strong> — no subscription required.
           </p>
         </motion.div>
 
