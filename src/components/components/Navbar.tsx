@@ -123,7 +123,7 @@ export default function Navbar() {
                   WhatsApp
                 </a>
                 <Link
-                  href="/register"
+                  href="/auth/login"
                   className="py-2.5 rounded-lg bg-[#EA580C] text-white text-sm font-semibold text-center"
                 >
                   Start Free Trial
