@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, Zap } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Zap } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
 
@@ -34,8 +34,8 @@ export default function LoginPage() {
 
   const f =
     (k: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((p) => ({ ...p, [k]: e.target.value }));
+      (e: React.ChangeEvent<HTMLInputElement>) =>
+        setForm((p) => ({ ...p, [k]: e.target.value }));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -135,10 +135,10 @@ export default function LoginPage() {
               {/* Feature cards — 2x2 grid */}
               <div className="grid grid-cols-2 gap-2.5 mt-5">
                 {[
-                  { title: 'AI ID Scan Check-In',   desc: 'Auto-fill guest details by scanning any government ID.',  bg: '#FFFBEB', border: '#FDE68A', color: AMBER },
-                  { title: 'Voice Task Commands',    desc: 'Create housekeeping tasks using simple voice commands.',   bg: '#FFF1F2', border: '#FECDD3', color: CORAL },
-                  { title: 'Dynamic Hotel Data',     desc: 'Room rates, folios & Wi-Fi pulled live from your APIs.',   bg: '#FFF7ED', border: '#FED7AA', color: MELON },
-                  { title: 'Live Staff Workflows',   desc: 'Real-time concierge updates and guest request handling.',  bg: '#F5F3FF', border: '#DDD6FE', color: '#7C3AED' },
+                  { title: 'AI ID Scan Check-In', desc: 'Auto-fill guest details by scanning any government ID.', bg: '#FFFBEB', border: '#FDE68A', color: AMBER },
+                  { title: 'Voice Task Commands', desc: 'Create housekeeping tasks using simple voice commands.', bg: '#FFF1F2', border: '#FECDD3', color: CORAL },
+                  { title: 'Dynamic Hotel Data', desc: 'Room rates, folios & Wi-Fi pulled live from your APIs.', bg: '#FFF7ED', border: '#FED7AA', color: MELON },
+                  { title: 'Live Staff Workflows', desc: 'Real-time concierge updates and guest request handling.', bg: '#F5F3FF', border: '#DDD6FE', color: '#7C3AED' },
                 ].map((item) => (
                   <div
                     key={item.title}
@@ -235,8 +235,17 @@ export default function LoginPage() {
               boxShadow: '0 24px 70px rgba(249,115,22,0.10)',
             }}
           >
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-sm font-medium mb-5 hover:underline"
+              style={{ color: MELON }}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </Link>
             {/* Header */}
             <div className="mb-6">
+
               <div
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4"
                 style={{

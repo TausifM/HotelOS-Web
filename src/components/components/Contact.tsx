@@ -20,7 +20,7 @@ const contactInfo = [
   {
     icon: MapPin,
     label: "Address",
-    value: "Bangalore, Karnataka, India",
+    value: "White Field, Beside Rose Layout, Bangalore, Karnataka, India",
     href: null,
   },
   {

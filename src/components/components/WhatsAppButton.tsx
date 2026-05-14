@@ -83,14 +83,14 @@ export default function WhatsAppButton() {
             >
               Start Free Trial — 120 din free
             </Link>
-            <a
+            {/* <a
               href={WA_LINK}
               target="_blank"
               rel="noopener noreferrer"
               className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center shrink-0"
             >
               <WhatsAppIcon className="w-6 h-6 text-white" />
-            </a>
+            </a> */}
           </motion.div>
         )}
       </AnimatePresence>
