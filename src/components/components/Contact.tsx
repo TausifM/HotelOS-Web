@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Phone, Mail, MapPin, Clock } from "lucide-react";
+import Image from "next/image";
 
 const contactInfo = [
   {
@@ -203,24 +204,24 @@ export default function Contact() {
             ))}
 
             {/* WhatsApp QR Placeholder */}
-            <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm text-center">
-              <div className="w-28 h-28 bg-gray-100 rounded-xl mx-auto mb-3 flex items-center justify-center">
-                <div className="grid grid-cols-3 gap-1">
-                  {[...Array(9)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-6 h-6 rounded-sm ${
-                        [0, 2, 6, 8, 4].includes(i)
-                          ? "bg-[#111827]"
-                          : "bg-gray-200"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-              <p className="text-sm font-semibold text-[#111827]">WhatsApp QR Code</p>
-              <p className="text-xs text-gray-400 mt-1">Scan to chat instantly</p>
+          <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm text-center">
+            <div className="w-28 h-28 rounded-xl mx-auto mb-3 overflow-hidden relative">
+              <Image
+                src="/qr-code.png"
+                alt="WhatsApp QR Code"
+                fill
+                className="object-cover rounded-xl"
+              />
             </div>
+
+            <p className="text-sm font-semibold text-[#111827]">   F
+              WhatsApp QR Code
+            </p>
+
+            <p className="text-xs text-gray-400 mt-1">
+              Scan to chat instantly
+            </p>
+          </div>
           </motion.div>
         </div>
       </div>
