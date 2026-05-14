@@ -140,7 +140,7 @@ export default function WhatsAppButton() {
             >
               Start Free Trial — 120 din free
             </Link>
-
+{/* 
             <button
               type="button"
               onClick={handleWhatsAppClick}
@@ -148,7 +148,7 @@ export default function WhatsAppButton() {
               className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center shrink-0"
             >
               <WhatsAppIcon className="w-6 h-6 text-white" />
-            </button>
+            </button> */}
           </motion.div>
         )}
       </AnimatePresence>

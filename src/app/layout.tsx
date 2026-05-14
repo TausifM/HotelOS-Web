@@ -248,7 +248,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${inter.className} font-sans antialiased bg-gray-50 text-gray-900`}
+        className={`${inter.variable} ${inter.className} font-sans antialiased bg-[#FDFCFB] text-gray-900`}
       >
         <Providers>{children}</Providers>
       </body>

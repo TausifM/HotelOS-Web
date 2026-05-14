@@ -5,6 +5,7 @@
 /* ───────────────── BASE THEME ───────────────── */
 @layer base {
   :root {
+    --background: #FDFCFB;
     --background: 30 40% 98%;
     --foreground: 24 20% 12%;
 

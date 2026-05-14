@@ -214,7 +214,7 @@ export default function Contact() {
               />
             </div>
 
-            <p className="text-sm font-semibold text-[#111827]">   F
+            <p className="text-sm font-semibold text-[#111827]">
               WhatsApp QR Code
             </p>
 
