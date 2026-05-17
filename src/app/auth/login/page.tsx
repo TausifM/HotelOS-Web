@@ -39,27 +39,56 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (loading) return;
+
     setLoading(true);
+
     try {
-      const { data } = await api.post('/api/auth/login', {
-        email: form.email,
-        password: form.password,
-      });
+      console.log("LOGIN START");
+
+      const response = await api.post(
+        "/api/auth/login",
+        {
+          email: form.email,
+          password: form.password,
+        },
+        {
+          timeout: 50000,
+          withCredentials: true,
+        }
+      );
+
+      console.log("LOGIN RESPONSE", response.data);
+
+      const data = response.data;
+
       login({
         accessToken: data.data.accessToken,
         refreshToken: data.data.refreshToken,
         staff: data.data.staff,
         tenant: data.data.tenant,
       });
+
       toast.success(`Welcome back, ${data.data.staff.name}!`);
-      router.replace('/dashboard');
+
+      // Small delay prevents navigation cancellation issues
+      setTimeout(() => {
+        router.replace("/dashboard");
+      }, 100);
+
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Login failed');
+      console.error("LOGIN ERROR", err);
+
+      toast.error(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Login failed"
+      );
     } finally {
       setLoading(false);
     }
   }
-
   return (
     /* Full viewport, centered, no scroll */
     <div

@@ -27,6 +27,7 @@ import {
   Building2,
   EyeOff,
   Eye,
+  ArrowLeft,
 } from 'lucide-react';
 
 const STATES = [
@@ -407,6 +408,14 @@ export default function RegisterPage() {
               boxShadow: '0 24px 70px rgba(249,115,22,0.10)',
             }}
           >
+             <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-sm font-medium mb-5 hover:underline"
+              style={{ color: MELON }}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </Link>
             <div className="mb-8">
               <div
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4"
