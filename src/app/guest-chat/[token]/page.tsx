@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 type MessageRole = 'guest' | 'bot' | 'staff';
@@ -98,7 +98,7 @@ interface MenuItem {
 }
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-const SOCKET_URL = (process.env.NEXT_PUBLIC_SOCKET_URL || API_URL).replace(/\/$/, '');
+const SOCKET_URL = (process.env.NEXT_PUBLIC_WS_URL || API_URL).replace(/\/$/, '');
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic'];
 
@@ -266,18 +266,17 @@ function useGuestSocket({
   conversationId,
   onMessage,
   onTyping,
-  onAck,
   onError,
 }: {
   token: string;
   conversationId: string;
   onMessage: (payload: any) => void;
   onTyping: (payload: any) => void;
-  onAck: (payload: any) => void;
   onError: (payload: any) => void;
 }) {
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!token || !conversationId || !SOCKET_URL) return;
@@ -288,39 +287,48 @@ function useGuestSocket({
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1500,
+      withCredentials: true,
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
       setConnected(true);
-      socket.emit('guest:join', { token, conversationId });
+      setReady(false);
+      socket.emit('chat:guest_join', { token });
+    });
+
+    socket.on('chat:guest_ready', () => {
+      setReady(true);
+      socket.emit('join:conversation', conversationId);
     });
 
     socket.on('disconnect', () => {
       setConnected(false);
+      setReady(false);
     });
 
-    socket.on('connect_error', () => {
+    socket.on('connect_error', (err) => {
       setConnected(false);
+      setReady(false);
+      onError({ message: err?.message || 'Socket connection failed' });
     });
 
     socket.on('chat:new-message', onMessage);
     socket.on('chat:typing', onTyping);
-    socket.on('chat:ack', onAck);
     socket.on('chat:error', onError);
 
     return () => {
       socket.off('chat:new-message', onMessage);
       socket.off('chat:typing', onTyping);
-      socket.off('chat:ack', onAck);
       socket.off('chat:error', onError);
+      socket.off('chat:guest_ready');
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token, conversationId, onMessage, onTyping, onAck, onError]);
+  }, [token, conversationId, onMessage, onTyping, onError]);
 
-  return { connected, socketRef };
+  return { connected, ready, socketRef };
 }
 
 function useGuestPolling({
@@ -480,16 +488,16 @@ function MessageBubble({
           style={
             guest
               ? {
-                  background: palette.primary,
-                  color: '#fff',
-                  borderBottomRightRadius: 8,
-                }
+                background: palette.primary,
+                color: '#fff',
+                borderBottomRightRadius: 8,
+              }
               : {
-                  background: palette.surface,
-                  color: palette.text,
-                  border: `1px solid ${palette.border}`,
-                  borderBottomLeftRadius: 8,
-                }
+                background: palette.surface,
+                color: palette.text,
+                border: `1px solid ${palette.border}`,
+                borderBottomLeftRadius: 8,
+              }
           }
         >
           {message.type === 'image' && message.imageUrl ? (
@@ -682,7 +690,7 @@ export default function GuestChatPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const { token } = React.use(params);
+  const { token } = use(params);
   const {
     loading,
     expired,
@@ -703,7 +711,6 @@ export default function GuestChatPage({
 
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const optimisticMap = useRef<Record<string, string>>({});
 
   const onSocketMessage = useCallback((raw: any) => {
     const incoming = toMessage({
@@ -736,36 +743,20 @@ export default function GuestChatPage({
     typingTimer.current = setTimeout(() => setIsTyping(false), 2500);
   }, []);
 
-  const onSocketAck = useCallback((payload: any) => {
-    const tempId = payload?.tempId;
-    const messageId = payload?.messageId;
-
-    if (!tempId) return;
-
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === tempId
-          ? { ...m, id: messageId || m.id, status: 'delivered' }
-          : m
-      )
-    );
-
-    setSending(false);
-  }, []);
-
   const onSocketError = useCallback((payload: any) => {
     setError(payload?.message || 'Socket error');
     setSending(false);
   }, [setError]);
 
-  const { connected, socketRef } = useGuestSocket({
+
+  const { connected, ready, socketRef } = useGuestSocket({
     token,
     conversationId,
     onMessage: onSocketMessage,
     onTyping: onSocketTyping,
-    onAck: onSocketAck,
     onError: onSocketError,
   });
+
 
   useGuestPolling({
     enabled: !!conversationId && !connected,
@@ -812,29 +803,36 @@ export default function GuestChatPage({
       },
     ]);
 
-    try {
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('guest:message', {
-          tempId,
-          token,
-          conversationId,
-          text,
-        });
+    if (socketRef.current?.connected && ready) {
+      socketRef.current.timeout(5000).emit(
+        'chat:guest_message',
+        { text },
+        (err: any, res: any) => {
+          if (err || !res?.success) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === tempId ? { ...m, status: 'failed' } : m
+              )
+            );
+            setSending(false);
+            return;
+          }
 
-        setTimeout(() => {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === tempId && m.status === 'sending'
-                ? { ...m, status: 'failed' }
+              m.id === tempId
+                ? { ...m, id: res.messageId || m.id, status: 'delivered' }
                 : m
             )
           );
           setSending(false);
-        }, 5000);
+        }
+      );
 
-        return;
-      }
+      return;
+    }
 
+    try {
       const res = await apiFetch<any>('/api/chatbot/guest/message', {
         method: 'POST',
         body: JSON.stringify({ token, text }),
@@ -855,7 +853,7 @@ export default function GuestChatPage({
     } finally {
       setSending(false);
     }
-  }, [input, sending, token, conversationId, setMessages, setError, socketRef]);
+  }, [input, sending, token, ready, setMessages, setError, socketRef]);
 
   const retryMessage = useCallback((id: string) => {
     const failed = messages.find((m) => m.id === id);
@@ -909,21 +907,39 @@ export default function GuestChatPage({
       setMessages((prev) =>
         prev.map((m) =>
           m.id === tempId
-            ? { ...m, imageUrl: url, thumbUrl, status: 'delivered' }
+            ? { ...m, imageUrl: url, thumbUrl, status: 'sending' }
             : m
         )
       );
 
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('guest:message', {
-          tempId,
-          token,
-          conversationId,
-          text: '[image]',
-          imageUrl: url,
-          thumbUrl,
-          messageType: 'image',
-        });
+      if (socketRef.current?.connected && ready) {
+        socketRef.current.timeout(5000).emit(
+          'chat:guest_message',
+          {
+            text: '[image]',
+            imageUrl: url,
+            thumbUrl,
+            messageType: 'image',
+          },
+          (err: any, res: any) => {
+            if (err || !res?.success) {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === tempId ? { ...m, status: 'failed' } : m))
+              );
+              setSending(false);
+              return;
+            }
+
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === tempId
+                  ? { ...m, id: res.messageId || m.id, status: 'delivered' }
+                  : m
+              )
+            );
+            setSending(false);
+          }
+        );
       }
     } catch (err: any) {
       setMessages((prev) =>

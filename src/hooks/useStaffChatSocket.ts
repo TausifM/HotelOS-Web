@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useSocket } from '@/hooks/useSocket';
 
 type StaffChatPayload = {
   conversationId?: string;
@@ -21,44 +21,21 @@ export function useStaffChatSocket({
   token?: string;
   onNewMessage: (data: StaffChatPayload) => void;
 }) {
+  const socket = useSocket();
   const handlerRef = useRef(onNewMessage);
   handlerRef.current = onNewMessage;
 
   useEffect(() => {
-    if (!tenantId || !token) return;
+    if (!socket || !tenantId || !token) return;
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiUrl) return;
-
-    const socket: Socket = io(apiUrl, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1500,
-      withCredentials: true,
-    });
-
-    socket.on('connect', () => {
-      console.log('[STAFF socket] connected', socket.id);
-    });
-
-    socket.on('connect_error', (e) => {
-      console.error('[STAFF socket] connect_error', e.message);
-    });
-
-    socket.on('chat:new_guest_message', (data) => {
-      console.log('[STAFF socket] chat:new_guest_message', data);
+    const handleGuestMessage = (data: StaffChatPayload) => {
       handlerRef.current(data);
-    });
+    };
 
-    socket.onAny((event, ...args) => {
-      console.log('[STAFF socket] event', event, args);
-    });
+    socket.on('chat:new_guest_message', handleGuestMessage);
 
     return () => {
-      socket.disconnect();
+      socket.off('chat:new_guest_message', handleGuestMessage);
     };
-  }, [tenantId, token]);
+  }, [socket, tenantId, token]);
 }

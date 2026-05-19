@@ -1,4 +1,5 @@
 'use client';
+
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import { useCallback } from 'react';
@@ -9,7 +10,11 @@ export function useAuth() {
   const router = useRouter();
 
   const logout = useCallback(async () => {
-    try { await api.post('/api/auth/logout'); } catch { /* ignore */ }
+    try {
+      await api.post('/api/auth/logout');
+    } catch {
+      // ignore
+    }
     store.logout();
     router.replace('/auth/login');
   }, [store, router]);
@@ -17,8 +22,10 @@ export function useAuth() {
   const hasPermission = useCallback((permission: string): boolean => {
     if (!store.staff) return false;
     if (store.staff.role === 'owner' || store.staff.role === 'superadmin') return true;
-    const perms = store.staff.permissions;
+
+    const perms = store.staff.permissions || [];
     if (perms.includes('*')) return true;
+
     const [resource] = permission.split('.');
     return perms.includes(permission) || perms.includes(`${resource}.*`);
   }, [store.staff]);
@@ -28,11 +35,13 @@ export function useAuth() {
   }, [store.staff]);
 
   return {
+    user: store.staff,
     staff: store.staff,
     tenant: store.tenant,
     isAuthenticated: store.isAuthenticated,
     isSuperAdmin: store.isSuperAdmin,
     accessToken: store.accessToken,
+    isHydrated: store.isHydrated,
     logout,
     hasPermission,
     hasRole,
