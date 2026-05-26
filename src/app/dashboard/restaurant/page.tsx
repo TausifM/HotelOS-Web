@@ -14,7 +14,7 @@ import {
 import { StatCard } from "@/components/restaurant/StatCard";
 import { OrderCard, type Order } from "@/components/restaurant/OrderCard";
 import { MenuItemCard } from "@/components/restaurant/MenuCard";
-import { CATEGORY_META, PRESET_ITEMS, type MenuItem } from "@/app/data/menuPresets";
+import { CATEGORY_META, getItemSuggestions, PRESET_ITEMS, type MenuItem } from "@/app/data/menuPresets";
 import { cn } from "@/lib/utils";
 import { Button, VisuallyHidden } from "@/components/ui";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -23,14 +23,21 @@ import api from "@/lib/api";
 const allPresetItems = Object.values(PRESET_ITEMS).flat();
 /* ─── EMPTY ITEM TEMPLATE ─────────────────────────────────────────────────── */
 const EMPTY_ITEM: MenuItem = {
-  id: "",
-  name: "",
+  id: '',
+  name: '',
   price: 0,
-  category: "main",
-  description: "",
+  category: 'main',
+  description: '',
   isAvailable: true,
   isVeg: true,
   preparationTime: 15,
+  // ── new fields ──
+  isPopular: false,
+  isChefSpecial: false,
+  spiceLevel: undefined,
+  serves: '',
+  calories: undefined,
+  rating: undefined,
 };
 
 /* ─── API HELPERS ─────────────────────────────────────────────────────────── */
@@ -139,6 +146,10 @@ export default function Index() {
   const [customMode, setCustomMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [suggestions, setSuggestions] = useState<{
+    calories: number[];
+    descriptions: string[];
+  } | null>(null);
   const [showGSTSettings, setShowGSTSettings] = useState(false);
 
   const [gstForm, setGstForm] = useState({
@@ -275,6 +286,7 @@ export default function Index() {
     setShowAddItem(false);
     setEditingItem(null);
     setFormData(EMPTY_ITEM);
+    setSuggestions(null); // ← add this line
   }
 
   function patchForm(patch: Partial<MenuItem>) {
@@ -1084,6 +1096,21 @@ export default function Index() {
                             <Clock className="h-2.5 w-2.5" />{item.preparationTime}m
                           </span>
                         )}
+                        {item.isPopular && (
+                          <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-600">
+                            🔥 Best seller
+                          </span>
+                        )}
+                        {item.isChefSpecial && (
+                          <span className="inline-flex items-center rounded-full bg-pink-50 px-2 py-0.5 text-[10px] font-bold text-pink-600">
+                            👨‍🍳 Chef's pick
+                          </span>
+                        )}
+                        {item.spiceLevel && (
+                          <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600 capitalize">
+                            🌶 {item.spiceLevel}
+                          </span>
+                        )}
                       </div>
                       {item.description && (
                         <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{item.description}</p>
@@ -1288,13 +1315,16 @@ export default function Index() {
                                     patchForm({
                                       name: item.name,
                                       price: item.price,
-                                      category:
-                                        item.category,
+                                      category: item.category,
                                       isVeg: item.isVeg,
                                     });
-
+                                    const sugg = getItemSuggestions(item.name);
+                                    setSuggestions(sugg);
+                                    if (sugg) {
+                                      patchForm({ calories: sugg.calories[0], description: sugg.descriptions[0] });
+                                    }
                                     setOpen(false);
-                                    setSearchQuery("");
+                                    setSearchQuery('');
                                   }}
                                   className="flex cursor-pointer items-center justify-between px-3 py-2.5 text-sm hover:bg-orange-50 transition-colors"
                                 >
@@ -1349,11 +1379,7 @@ export default function Index() {
                         <div className="border-t border-input">
                           <div
                             onClick={() => {
-                              patchForm({
-                                name: "",
-                                itemId: undefined,
-                              });
-
+                              patchForm({ name: searchQuery });
                               setCustomMode(true);
                               setOpen(false);
                               setSearchQuery("");
@@ -1379,7 +1405,7 @@ export default function Index() {
                         onChange={(e) =>
                           patchForm({
                             name: e.target.value,
-                            itemId: undefined,
+                            itemId: "",
                           })
                         }
                         placeholder="Type custom item name..."
@@ -1395,11 +1421,7 @@ export default function Index() {
                       type="button"
                       onClick={() => {
                         setCustomMode(false);
-
-                        patchForm({
-                          name: "",
-                          itemId: undefined,
-                        });
+                        patchForm({ name: '' }); // ← remove itemId: undefined
                       }}
                       className="flex h-11 w-11 items-center justify-center rounded-xl border border-input text-muted-foreground hover:bg-muted transition-colors"
                     >
@@ -1580,23 +1602,162 @@ export default function Index() {
               </div>
 
               {/* Description */}
+              {/* ── Auto Suggestions (shown when known item selected) ── */}
+              {suggestions && !customMode && (
+                <div className="space-y-3 rounded-2xl border border-orange-100 bg-orange-50/40 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-orange-600">
+                    ✨ Smart suggestions for "{formData.name}"
+                  </p>
+
+                  {/* Description options */}
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Pick a description</p>
+                    {suggestions.descriptions.map((desc, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => patchForm({ description: desc })}
+                        className={cn(
+                          'w-full rounded-xl border px-3 py-2.5 text-left text-xs leading-relaxed transition-all',
+                          formData.description === desc
+                            ? 'border-orange-400 bg-white font-medium text-foreground shadow-sm'
+                            : 'border-border bg-white/60 text-muted-foreground hover:border-orange-200 hover:bg-white'
+                        )}
+                      >
+                        <span className="mr-1.5 font-bold text-orange-400">{i + 1}.</span>
+                        {desc}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Calorie options */}
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Calories (kcal)</p>
+                    <div className="flex gap-2">
+                      {suggestions.calories.map((cal, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => patchForm({ calories: cal })}
+                          className={cn(
+                            'flex-1 rounded-xl border py-2 text-center text-xs font-semibold transition-all',
+                            formData.calories === cal
+                              ? 'border-orange-400 bg-orange-50 text-orange-700 shadow-sm'
+                              : 'border-border bg-white text-muted-foreground hover:border-orange-200'
+                          )}
+                        >
+                          <div className="text-sm font-bold">{cal}</div>
+                          <div className="mt-0.5 text-[10px] font-normal">
+                            {(['Light', 'Standard', 'Rich'] as const)[i]}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Description — manual input */}
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Description
+                  {suggestions && !customMode && (
+                    <span className="ml-2 normal-case font-normal text-orange-500">
+                      or type your own below
+                    </span>
+                  )}
                 </label>
-
                 <Input
-                  value={formData.description || ""}
-                  onChange={(e) =>
-                    patchForm({
-                      description: e.target.value,
-                    })
-                  }
+                  value={formData.description}
+                  onChange={(e) => patchForm({ description: e.target.value })}
                   placeholder="e.g. Rich creamy tomato gravy"
                   className="h-11 rounded-xl text-sm"
                 />
               </div>
+              {/* Spice Level */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Spice Level <span className="ml-1 normal-case font-normal text-muted-foreground/60">optional</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['mild', 'medium', 'hot'] as const).map((level) => {
+                    const config = { mild: { label: 'Mild 🌿', color: '#16a34a', bg: '#f0fdf4' }, medium: { label: 'Medium 🌶', color: '#d97706', bg: '#fffbeb' }, hot: { label: 'Hot 🔥', color: '#dc2626', bg: '#fef2f2' } };
+                    const active = formData.spiceLevel === level;
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => patchForm({ spiceLevel: active ? undefined : level })}
+                        className="rounded-xl py-2.5 text-sm font-semibold transition-all"
+                        style={{
+                          border: `2px solid ${active ? config[level].color : '#e2e8f0'}`,
+                          background: active ? config[level].bg : 'transparent',
+                          color: active ? config[level].color : '#94a3b8',
+                        }}
+                      >
+                        {config[level].label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
+              {/* Serves + Calories */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Serves <span className="ml-1 normal-case font-normal text-muted-foreground/60">optional</span>
+                  </label>
+                  <Input
+                    value={formData.serves ?? ''}
+                    onChange={(e) => patchForm({ serves: e.target.value })}
+                    placeholder="e.g. 1–2 persons"
+                    className="h-11 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Calories <span className="ml-1 normal-case font-normal text-muted-foreground/60">kcal</span>
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={formData.calories ?? ''}
+                    onChange={(e) => patchForm({ calories: parseInt(e.target.value) || undefined })}
+                    placeholder="e.g. 450"
+                    className="h-11 rounded-xl text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Popular + Chef Special toggles */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { key: 'isPopular' as const, label: 'Best Seller', desc: 'Show trending badge', icon: '🔥' },
+                  { key: 'isChefSpecial' as const, label: "Chef's Pick", desc: 'Show chef special badge', icon: '👨‍🍳' },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => patchForm({ [opt.key]: !formData[opt.key] })}
+                    className="flex items-center justify-between rounded-2xl p-3 text-left transition-all"
+                    style={{
+                      background: formData[opt.key] ? '#fff7ed' : '#f8fafc',
+                      border: `1.5px solid ${formData[opt.key] ? '#fed7aa' : '#e2e8f0'}`,
+                    }}
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{opt.icon} {opt.label}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{opt.desc}</p>
+                    </div>
+                    <Switch
+                      checked={!!formData[opt.key]}
+                      onCheckedChange={(v) => patchForm({ [opt.key]: v })}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                  </button>
+                ))}
+              </div>
               {/* Available */}
               <div
                 className="flex items-center justify-between rounded-2xl p-3"

@@ -1,34 +1,11 @@
 'use client';
 
+import CheckoutOverdueCard from '@/components/guest-chat/CheckoutOverdueCard';
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
 
 type MessageRole = 'guest' | 'bot' | 'staff';
 type MessageType = 'text' | 'image' | 'actionresult';
 type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
-
-type ActionType =
-  | 'restaurantorder'
-  | 'housekeeping'
-  | 'maintenance'
-  | 'folio'
-  | 'checkout'
-  | 'stayextension'
-  | 'escalation';
-
-type StatusBadge = 'pending' | 'preparing' | 'ready' | 'delivered';
-
-interface ActionResult {
-  type: ActionType;
-  items?: string[];
-  summary?: string;
-  issueTitle?: string;
-  total?: number;
-  newCheckout?: string;
-  amount?: number;
-  paymentLink?: string;
-  status?: StatusBadge;
-}
 
 interface ApiMessage {
   _id?: string;
@@ -36,7 +13,6 @@ interface ApiMessage {
   senderType: MessageRole;
   text?: string;
   messageType?: MessageType;
-  actionResult?: ActionResult;
   mediaUrl?: string;
   imageUrl?: string;
   thumbUrl?: string;
@@ -44,6 +20,23 @@ interface ApiMessage {
   createdAt?: string;
   senderName?: string;
   status?: MessageStatus;
+  action?: MessageAction;   // ← ADD THIS
+}
+
+// ── Add this new interface above Message ──
+interface MessageAction {
+  type: string;
+  title?: string;
+  options?: Array<{
+    label: string;
+    url: string;
+    style: string;
+    tooltip?: string;
+  }>;
+  minutesLate?: number;
+  roomNumber?: string;
+  hours?: number;
+  note?: string;
 }
 
 interface Message {
@@ -52,33 +45,57 @@ interface Message {
   text: string;
   timestamp: Date;
   type: MessageType;
-  actionResult?: ActionResult;
   imageUrl?: string;
   thumbUrl?: string;
   imageName?: string;
   status?: MessageStatus;
   senderName?: string;
+  orderCard?: {
+    name: string;
+    price: number;
+    qty: number;
+    note?: string;
+    imageUrl?: string;
+    category?: string;
+    isVeg?: boolean;
+    description?: string;
+    prepTime?: string;
+  };
+  action?: MessageAction;   // ← ADD THIS
 }
 
-interface GuestProfile {
-  firstName?: string;
-  lastName?: string;
-  name?: string;
-}
-
-interface ConversationData {
+interface MenuItem {
   _id?: string;
-  id?: string;
-  roomNumber?: string;
-  tenantId?: string;
-  subject?: string;
+  name: string;
+  price: number;
+  category: string;
+  description?: string;
+  imageUrl?: string;
+  isVeg?: boolean;
+  prepTime?: string;
+  rating?: number;
+  tags?: string[];
+  isPopular?: boolean;
+  isChefSpecial?: boolean;
+  isAvailable?: boolean;
+  calories?: number;
+  serves?: string;
+  spiceLevel?: 'mild' | 'medium' | 'hot';
 }
 
 interface GuestAccessResponseData {
-  conversation?: ConversationData;
+  conversation?: {
+    _id?: string;
+    id?: string;
+    roomNumber?: string;
+  };
   conversationId?: string;
   messages?: ApiMessage[];
-  guest?: GuestProfile;
+  guest?: {
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+  };
   tenant?: {
     hotelName?: string;
   };
@@ -90,32 +107,45 @@ interface GuestAccessResponseData {
   roomNumber?: string;
 }
 
-interface MenuItem {
-  name: string;
-  price: number;
-  category: string;
-  description?: string;
-}
-
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 const SOCKET_URL = (process.env.NEXT_PUBLIC_WS_URL || API_URL).replace(/\/$/, '');
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic'];
 
-const palette = {
-  bg: '#f6f2ec',
-  surface: '#ffffff',
-  surfaceSoft: '#fbf8f4',
-  border: '#e7ded3',
-  text: '#1f1b16',
-  muted: '#6f675f',
-  faint: '#9f968d',
-  primary: '#8b5e3c',
-  primaryDark: '#6f492d',
+const theme = {
+  bg: 'linear-gradient(135deg, #fff4ec 0%, #ffe8ef 55%, #fff6e9 100%)',
+  panel: 'rgba(255,255,255,0.82)',
+  panelStrong: '#ffffff',
+  text: '#261815',
+  muted: '#7a5a53',
+  faint: '#b58c84',
+  border: '#f0c8bf',
+  orange: '#ff7a45',
+  orangeDark: '#ea5d28',
+  pink: '#e84d8a',
+  red: '#d94b4b',
   success: '#1f7a5a',
-  warning: '#9b6b12',
-  danger: '#b14444',
+  shadow: '0 20px 60px rgba(225, 117, 92, 0.18)',
+  bubble: 'linear-gradient(135deg, #ff824d 0%, #ea4f89 100%)',
+  chip: 'linear-gradient(135deg, #fff0ea 0%, #ffe8f4 100%)',
+  hero: 'linear-gradient(135deg,#F97316 0%,#F43F5E 100%)'
 };
+
+const QUICK_ACTIONS = [
+  { label: 'Housekeeping', text: 'Need housekeeping' },
+  { label: 'Water', text: 'Send water bottles' },
+  { label: 'Towels', text: 'Need fresh towels' },
+  { label: 'Cleaning', text: 'Room cleaning please' },
+  { label: 'Late checkout', text: 'Late checkout request' },
+  { label: 'Restaurant menu', text: 'Need restaurant menu' },
+];
+
+const HOTEL_SERVICES = [
+  { title: 'Dining', subtitle: 'Browse restaurant menu' },
+  { title: 'Housekeeping', subtitle: 'Cleaning, towels, toiletries' },
+  { title: 'Checkout', subtitle: 'Request late checkout or bill' },
+  { title: 'Amenities', subtitle: 'Wi-Fi, gym, pool, spa info' },
+];
 
 function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -135,52 +165,50 @@ function formatTime(date: Date) {
 
 function toMessage(m: ApiMessage): Message {
   return {
-    id: m._id || m.id || genId(),
+    id: m._id ?? m.id ?? genId(),  // ← add m._id here
     role: m.senderType,
-    text: m.text || '',
-    timestamp: new Date(m.createdAt || Date.now()),
-    type: m.messageType || (m.imageUrl || m.mediaUrl ? 'image' : 'text'),
-    actionResult: m.actionResult,
-    imageUrl: m.imageUrl || m.mediaUrl,
+    text: m.text ?? '',
+    timestamp: new Date(m.createdAt ?? Date.now()),
+    type: m.messageType ?? (m.imageUrl || m.mediaUrl ? 'image' : 'text'),
+    imageUrl: m.imageUrl ?? m.mediaUrl,
     thumbUrl: m.thumbUrl,
     imageName: m.imageName,
     senderName: m.senderName,
-    status: m.status || 'read',
+    status: m.status ?? 'read',
+    action: m.action,
   };
 }
 
-async function apiFetch<T = any>(path: string, init?: RequestInit) {
-  if (!API_URL) {
-    throw new Error('NEXT_PUBLIC_API_URL is not configured');
-  }
+// ── FIX #2: apiFetch with guaranteed Content-Type + better error body ─────────
+async function apiFetch<T = any>(path: string, init?: RequestInit): Promise<T> {
+  if (!API_URL) throw new Error('NEXT_PUBLIC_API_URL is not configured');
 
-  const res = await fetch(`${API_URL}${path}`, {
+  // Ensure path starts with /
+  const url = `${API_URL}${path.startsWith('/') ? path : `/${path}`}`;
+  const isFormData = init?.body instanceof FormData;
+
+  const res = await fetch(url, {
     ...init,
     headers: {
-      ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(init?.headers || {}),
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...init?.headers,
     },
     cache: 'no-store',
   });
 
+  // FIX #3: Always parse the body, even on error status
   const json = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    throw new Error(json?.message || `Request failed with ${res.status}`);
-  }
-
+  if (!res.ok) throw new Error(json?.message ?? `Request failed with ${res.status}`);
   return json as T;
 }
 
 function useGuestAccess(token: string) {
   const [loading, setLoading] = useState(true);
   const [expired, setExpired] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [conversationId, setConversationId] = useState<string>('');
-  const [hotelName, setHotelName] = useState<string>('Hotel');
-  const [roomNumber, setRoomNumber] = useState<string>('');
-  const [guestName, setGuestName] = useState<string>('');
+  const [conversationId, setConversationId] = useState('');
+  const [hotelName, setHotelName] = useState('Hotel');
+  const [roomNumber, setRoomNumber] = useState('');
+  const [guestName, setGuestName] = useState('Guest');
   const [messages, setMessages] = useState<Message[]>([]);
 
   const load = useCallback(async () => {
@@ -191,7 +219,6 @@ function useGuestAccess(token: string) {
     }
 
     setLoading(true);
-    setError(null);
 
     try {
       const json = await apiFetch<{ success: boolean; data: GuestAccessResponseData }>(
@@ -205,38 +232,17 @@ function useGuestAccess(token: string) {
       const data = json?.data || {};
       const conversation = data.conversation || {};
 
-      const resolvedConversationId =
-        data.conversationId || conversation._id || conversation.id || '';
-
-      const resolvedHotelName =
-        data.hotelName ||
-        data.tenant?.hotelName ||
-        data.reservation?.hotelName ||
-        'Hotel';
-
-      const resolvedRoomNumber =
-        data.roomNumber ||
-        data.reservation?.roomNumber ||
-        conversation.roomNumber ||
-        '';
-
-      const resolvedGuestName =
+      setConversationId(data.conversationId || conversation._id || conversation.id || '');
+      setHotelName(data.hotelName || data.tenant?.hotelName || data.reservation?.hotelName || 'Hotel');
+      setRoomNumber(data.roomNumber || data.reservation?.roomNumber || conversation.roomNumber || '');
+      setGuestName(
         data.guest?.name ||
         [data.guest?.firstName, data.guest?.lastName].filter(Boolean).join(' ') ||
-        'Guest';
-
-      setConversationId(resolvedConversationId);
-      setHotelName(resolvedHotelName);
-      setRoomNumber(resolvedRoomNumber);
-      setGuestName(resolvedGuestName);
+        'Guest'
+      );
       setMessages(Array.isArray(data.messages) ? data.messages.map(toMessage) : []);
     } catch (err: any) {
-      const message = String(err?.message || '');
-      if (/expired|invalid|401/i.test(message)) {
-        setExpired(true);
-      } else {
-        setError(message || 'Failed to load guest chat');
-      }
+      if (/expired|invalid|401/i.test(String(err?.message || ''))) setExpired(true);
     } finally {
       setLoading(false);
     }
@@ -249,103 +255,38 @@ function useGuestAccess(token: string) {
   return {
     loading,
     expired,
-    error,
-    setError,
     conversationId,
     hotelName,
     roomNumber,
     guestName,
     messages,
     setMessages,
-    reload: load,
   };
 }
 
-function useGuestSocket({
-  token,
-  conversationId,
-  onMessage,
-  onTyping,
-  onError,
-}: {
-  token: string;
-  conversationId: string;
-  onMessage: (payload: any) => void;
-  onTyping: (payload: any) => void;
-  onError: (payload: any) => void;
-}) {
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
-  const [ready, setReady] = useState(false);
+// ─── REPLACE entire useGuestPolling ──────────────────────────────────────────
+function useGuestPolling(
+  token: string,
+  conversationId: string | undefined,
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
+  initialMessages: Message[]
+) {
+  const lastSeenRef = useRef<string | undefined>(undefined);
+  const seededRef = useRef(false);
 
   useEffect(() => {
-    if (!token || !conversationId || !SOCKET_URL) return;
-
-    const socket = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
-      auth: { token },
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1500,
-      withCredentials: true,
-    });
-
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      setConnected(true);
-      setReady(false);
-      socket.emit('chat:guest_join', { token });
-    });
-
-    socket.on('chat:guest_ready', () => {
-      setReady(true);
-      socket.emit('join:conversation', conversationId);
-    });
-
-    socket.on('disconnect', () => {
-      setConnected(false);
-      setReady(false);
-    });
-
-    socket.on('connect_error', (err) => {
-      setConnected(false);
-      setReady(false);
-      onError({ message: err?.message || 'Socket connection failed' });
-    });
-
-    socket.on('chat:new-message', onMessage);
-    socket.on('chat:typing', onTyping);
-    socket.on('chat:error', onError);
-
-    return () => {
-      socket.off('chat:new-message', onMessage);
-      socket.off('chat:typing', onTyping);
-      socket.off('chat:error', onError);
-      socket.off('chat:guest_ready');
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [token, conversationId, onMessage, onTyping, onError]);
-
-  return { connected, ready, socketRef };
-}
-
-function useGuestPolling({
-  enabled,
-  token,
-  conversationId,
-  setMessages,
-}: {
-  enabled: boolean;
-  token: string;
-  conversationId: string;
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-}) {
-  const lastSeenRef = useRef<string>('');
+    // Seed once when initial messages are available
+    if (!seededRef.current && initialMessages.length > 0) {
+      const latest = [...initialMessages].sort(
+        (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+      )[0];
+      lastSeenRef.current = latest.timestamp.toISOString();
+      seededRef.current = true;
+    }
+  }, [initialMessages]);
 
   useEffect(() => {
-    if (!enabled || !token || !conversationId) return;
+    if (!token || !conversationId) return;
 
     const interval = setInterval(async () => {
       try {
@@ -357,110 +298,661 @@ function useGuestPolling({
           `/api/chatbot/guest/messages${qs}`
         );
 
-        const incoming = (res?.data?.messages || []).map(toMessage);
+        const incoming = (res?.data?.messages ?? []).map(toMessage);
+        if (!incoming.length) return;
 
-        if (incoming.length) {
-          lastSeenRef.current = incoming[incoming.length - 1].timestamp.toISOString();
-          setMessages((prev) => {
-            const existing = new Set(prev.map((m) => m.id));
-            const merged = [...prev];
-            for (const item of incoming) {
-              if (!existing.has(item.id)) merged.push(item);
+        // Update lastSeen to latest timestamp
+        const latest = [...incoming].sort(
+          (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+        )[0];
+        lastSeenRef.current = latest.timestamp.toISOString();
+
+        setMessages((prev) => {
+          // Deduplicate by id
+          const existingIds = new Set(prev.map((m) => m.id));
+
+          // Deduplicate by content signature — catches tempId vs real _id mismatch
+          // Groups messages into 5-second buckets to match optimistic entries
+          const existingSigs = new Set(
+            prev.map(
+              (m) =>
+                `${m.role}||${m.text.trim()}||${Math.floor(m.timestamp.getTime() / 5000)}`
+            )
+          );
+
+          const toAdd = incoming.filter((item) => {
+            // Already exists by real ID
+            if (existingIds.has(item.id)) return false;
+
+            // Matches an optimistic message (same role + text + ~same time)
+            const sig = `${item.role}||${item.text.trim()}||${Math.floor(
+              item.timestamp.getTime() / 5000
+            )}`;
+            if (existingSigs.has(sig)) {
+              // Silently upgrade the optimistic entry's id to the real id
+              // (do this outside filter via a separate pass below)
+              return false;
             }
-            return merged;
+
+            return true;
           });
-        }
+
+          // Upgrade any matched optimistic entries to their real server IDs
+          const upgraded = prev.map((m) => {
+            if (m.status !== 'sending' && m.status !== 'delivered') return m;
+            const match = incoming.find(
+              (item) =>
+                `${item.role}||${item.text.trim()}||${Math.floor(item.timestamp.getTime() / 5000)}` ===
+                `${m.role}||${m.text.trim()}||${Math.floor(m.timestamp.getTime() / 5000)}`
+            );
+            if (match && m.id !== match.id) {
+              return { ...m, id: match.id, status: 'delivered' as const };
+            }
+            return m;
+          });
+
+          return toAdd.length ? [...upgraded, ...toAdd] : upgraded;
+        });
       } catch {
-        // silent fallback
+        // silent
       }
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [enabled, token, conversationId, setMessages]);
+  }, [token, conversationId, setMessages]);
 }
 
-function useMenu(token: string) {
-  const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<MenuItem[]>([]);
+function useGuestMenu(token: string) {
+  const [menuLoading, setMenuLoading] = useState(false);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const fetchMenu = useCallback(async () => {
-    setLoading(true);
+    if (!token) return;
+    setMenuLoading(true);
     try {
       const res = await apiFetch<{ success: boolean; data: { items: MenuItem[] } }>(
-        `/api/chatbot/menu?token=${encodeURIComponent(token)}`
+        `/api/chatbot/guest/menu?token=${encodeURIComponent(token)}`
       );
-      const next = res?.data?.items || [];
-      setItems(next);
-      return next;
+      setMenuItems(res?.data?.items || []);
+      setMenuOpen(true);
     } finally {
-      setLoading(false);
+      setMenuLoading(false);
     }
   }, [token]);
 
-  return { items, loading, fetchMenu };
+  return { menuLoading, menuItems, menuOpen, setMenuOpen, fetchMenu };
 }
 
 function Header({
   hotelName,
   guestName,
   roomNumber,
-  connected,
 }: {
   hotelName: string;
   guestName: string;
   roomNumber: string;
-  connected: boolean;
 }) {
   return (
-    <header
-      className="sticky top-0 z-20 flex items-center justify-between border-b px-4 py-4 md:px-6"
-      style={{ background: 'rgba(246,242,236,0.92)', borderColor: palette.border, backdropFilter: 'blur(10px)' }}
+    <div
+      className="border-b p-5 md:p-6"
+      style={{
+        borderColor: 'rgba(255,255,255,0.2)',
+        background: theme.hero,
+        color: '#fff',
+      }}
     >
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: palette.faint }}>
-          Guest concierge
-        </p>
-        <h1 className="truncate text-lg font-semibold" style={{ color: palette.text }}>
-          {hotelName}
-        </h1>
-        <p className="truncate text-sm" style={{ color: palette.muted }}>
-          {guestName}{roomNumber ? ` · Room ${roomNumber}` : ''}
-        </p>
-      </div>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/70">
+            Guest concierge
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold">{hotelName}</h1>
+          <p className="mt-1 text-sm text-white/80">
+            {guestName}{roomNumber ? ` · Room ${roomNumber}` : ''}
+          </p>
+        </div>
 
-      <div
-        className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium"
-        style={{
-          borderColor: connected ? '#b6dfd0' : palette.border,
-          background: connected ? '#eefaf4' : palette.surface,
-          color: connected ? palette.success : palette.muted,
-        }}
-      >
-        <span
-          className="h-2.5 w-2.5 rounded-full"
-          style={{ background: connected ? palette.success : '#b7b0a7' }}
-        />
-        {connected ? 'Live' : 'Polling'}
+        <div className="rounded-full bg-white/18 px-3 py-1.5 text-xs font-medium backdrop-blur">
+          24×7 assistance
+        </div>
       </div>
-    </header>
+    </div>
   );
 }
 
-function EmptyState({ hotelName }: { hotelName: string }) {
+function ServiceCards({
+  onOpenMenu,
+  onPick,
+}: {
+  onOpenMenu: () => void;
+  onPick: (value: string) => void;
+}) {
   return (
-    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div
-        className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border text-xl font-semibold"
-        style={{ background: palette.surface, borderColor: palette.border, color: palette.primary }}
-      >
-        {hotelName.charAt(0).toUpperCase()}
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {HOTEL_SERVICES.map((item) => (
+          <button
+            key={item.title}
+            type="button"
+            onClick={() => (item.title === 'Dining' ? onOpenMenu() : onPick(item.title))}
+            className="rounded-3xl border p-4 text-left transition hover:-translate-y-0.5"
+            style={{
+              background: 'rgba(255,255,255,0.88)',
+              borderColor: theme.border,
+              boxShadow: '0 8px 24px rgba(255, 122, 69, 0.08)',
+            }}
+          >
+            <div className="text-sm font-semibold" style={{ color: theme.text }}>
+              {item.title}
+            </div>
+            <div className="mt-1 text-xs leading-5" style={{ color: theme.muted }}>
+              {item.subtitle}
+            </div>
+          </button>
+        ))}
       </div>
-      <h2 className="text-lg font-semibold" style={{ color: palette.text }}>
-        Welcome to {hotelName}
-      </h2>
-      <p className="mt-2 max-w-md text-sm leading-6" style={{ color: palette.muted }}>
-        Ask for room service, housekeeping, maintenance, billing, checkout, or any stay assistance.
-      </p>
+
+      <div className="flex flex-wrap gap-2">
+        {QUICK_ACTIONS.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => onPick(item.text)}
+            className="rounded-full px-4 py-2.5 text-sm font-medium transition hover:scale-[1.02]"
+            style={{
+              background: theme.chip,
+              color: theme.text,
+              border: '1px solid #ffd3c8',
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MenuSheet({
+  open,
+  onClose,
+  loading,
+  items,
+  onOrderItem,
+}: {
+  open: boolean;
+  onClose: () => void;
+  loading: boolean;
+  items: MenuItem[];
+  onOrderItem: (item: MenuItem, qty?: number, note?: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [vegOnly, setVegOnly] = useState(false);
+  const [quickOnly, setQuickOnly] = useState(false);
+  const [qtyMap, setQtyMap] = useState<Record<string, number>>({});
+  const [noteMap, setNoteMap] = useState<Record<string, string>>({});
+
+  if (!open) return null;
+
+  const categories = ['All', ...Array.from(new Set(items.map((i) => i.category || 'Other')))];
+
+  const filtered = items.filter((item) => {
+    const matchesQuery =
+      !query ||
+      item.name.toLowerCase().includes(query.toLowerCase()) ||
+      item.description?.toLowerCase().includes(query.toLowerCase()) ||
+      item.category?.toLowerCase().includes(query.toLowerCase());
+
+    const matchesCategory = activeCategory === 'All' || (item.category || 'Other') === activeCategory;
+    const matchesVeg = !vegOnly || !!item.isVeg;
+    const matchesQuick =
+      !quickOnly ||
+      (item.prepTime ? parseInt(item.prepTime.replace(/\D/g, ''), 10) <= 20 : false);
+
+    return matchesQuery && matchesCategory && matchesVeg && matchesQuick;
+  });
+
+  const grouped = filtered.reduce<Record<string, MenuItem[]>>((acc, item) => {
+    const key = item.category || 'Other';
+    acc[key] ||= [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  const totalItems = Object.values(qtyMap).reduce((a, b) => a + b, 0);
+  const totalAmount = filtered.reduce((sum, item) => {
+    const key = item._id || item.name;
+    return sum + (qtyMap[key] || 0) * Number(item.price || 0);
+  }, 0);
+
+  const setQty = (key: string, next: number) => {
+    setQtyMap((prev) => ({
+      ...prev,
+      [key]: Math.max(0, next),
+    }));
+  };
+
+  return (
+    <div className="absolute inset-0 z-30 flex items-end bg-black/40 p-0 md:items-center md:justify-center md:p-6">
+      <div
+        className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-t-[32px] border md:h-[88vh] md:rounded-[32px]"
+        style={{
+          background: 'rgba(255,250,248,0.94)',
+          borderColor: 'rgba(255,255,255,0.4)',
+          boxShadow: '0 24px 80px rgba(120, 45, 30, 0.18)',
+          backdropFilter: 'blur(24px)',
+        }}
+      >
+        <div
+          className="border-b px-5 py-4 md:px-6"
+          style={{
+            borderColor: theme.border,
+            background: 'linear-gradient(135deg, rgba(255,139,94,0.96), rgba(236,91,148,0.92))',
+            color: '#fff',
+          }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+                In-room dining
+              </p>
+              <h3 className="mt-1 text-xl font-semibold">Restaurant menu</h3>
+              <p className="mt-1 text-sm text-white/80">
+                Curated for your stay · Freshly prepared and delivered to your room
+              </p>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="rounded-full bg-white/15 px-4 py-2 text-sm font-medium backdrop-blur"
+              type="button"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="flex-1 rounded-2xl bg-white/14 px-4 py-3 backdrop-blur">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search dishes, drinks, desserts..."
+                className="w-full bg-transparent text-sm text-white placeholder:text-white/70 outline-none"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setVegOnly((v) => !v)}
+                className={cx(
+                  'rounded-full px-3 py-2 text-xs font-semibold transition',
+                  vegOnly && 'ring-2 ring-white/60'
+                )}
+                style={{ background: vegOnly ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.12)' }}
+              >
+                Veg only
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuickOnly((v) => !v)}
+                className={cx(
+                  'rounded-full px-3 py-2 text-xs font-semibold transition',
+                  quickOnly && 'ring-2 ring-white/60'
+                )}
+                style={{ background: quickOnly ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.12)' }}
+              >
+                Under 20 min
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-b px-4 py-3 md:px-6" style={{ borderColor: '#f3d8d1', background: 'rgba(255,255,255,0.7)' }}>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setActiveCategory(cat)}
+                className="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium"
+                style={{
+                  background: activeCategory === cat ? theme.bubble : '#fff',
+                  color: activeCategory === cat ? '#fff' : theme.text,
+                  border: activeCategory === cat ? 'none' : `1px solid ${theme.border}`,
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
+          {loading ? (
+            <div className="py-16 text-center text-sm" style={{ color: theme.muted }}>
+              Loading menu...
+            </div>
+          ) : !filtered.length ? (
+            <div className="py-16 text-center">
+              <div className="mx-auto max-w-md rounded-[28px] border bg-white p-6" style={{ borderColor: theme.border }}>
+                <h4 className="text-lg font-semibold" style={{ color: theme.text }}>
+                  No dishes match your filters
+                </h4>
+                <p className="mt-2 text-sm" style={{ color: theme.muted }}>
+                  Try another category or remove a filter to see more items.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {Object.entries(grouped).map(([category, list]) => (
+                <section key={category}>
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-[0.18em]" style={{ color: theme.faint }}>
+                        {category}
+                      </h4>
+                      <p className="mt-1 text-xs" style={{ color: theme.muted }}>
+                        {list.length} item{list.length > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {list.map((item, idx) => {
+                      const key = item._id || `${category}-${idx}-${item.name}`;
+                      const qty = qtyMap[key] || 0;
+                      const note = noteMap[key] || '';
+
+                      return (
+                        <article
+                          key={key}
+                          className="group overflow-hidden rounded-[28px] border bg-white transition duration-300 hover:-translate-y-1"
+                          style={{
+                            borderColor: '#efd7cf',
+                            boxShadow: '0 12px 30px rgba(243, 129, 96, 0.08)',
+                          }}
+                        >
+                          <div className="relative">
+                            <div className="aspect-[16/10] w-full overflow-hidden bg-gradient-to-br from-orange-50 to-rose-50">
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-sm font-medium" style={{ color: theme.faint }}>
+                                  No image available
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+                              <span
+                                className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                                style={{
+                                  background: item.isVeg ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                                  color: item.isVeg ? '#15803d' : '#b91c1c',
+                                }}
+                              >
+                                {item.isVeg ? 'VEG' : 'NON-VEG'}
+                              </span>
+
+                              {item.isPopular ? (
+                                <span className="rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-semibold text-orange-700">
+                                  Best seller
+                                </span>
+                              ) : null}
+
+                              {item.isChefSpecial ? (
+                                <span className="rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-semibold text-pink-700">
+                                  Chef’s pick
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h5 className="truncate text-base font-semibold" style={{ color: theme.text }}>
+                                  {item.name}
+                                </h5>
+                                {item.description ? (
+                                  <p className="mt-1 line-clamp-2 text-sm leading-5" style={{ color: theme.muted }}>
+                                    {item.description}
+                                  </p>
+                                ) : null}
+                              </div>
+
+                              <div className="shrink-0 text-right">
+                                <div className="text-lg font-semibold" style={{ color: theme.orangeDark }}>
+                                  ₹{Number(item.price || 0).toLocaleString('en-IN')}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              {item.prepTime ? (
+                                <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: theme.border, color: theme.muted }}>
+                                  ⏱ {item.prepTime}
+                                </span>
+                              ) : null}
+
+                              {typeof item.rating === 'number' ? (
+                                <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: theme.border, color: theme.muted }}>
+                                  ★ {item.rating.toFixed(1)}
+                                </span>
+                              ) : null}
+
+                              {item.serves ? (
+                                <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: theme.border, color: theme.muted }}>
+                                  Serves {item.serves}
+                                </span>
+                              ) : null}
+
+                              {item.spiceLevel ? (
+                                <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize" style={{ borderColor: theme.border, color: theme.muted }}>
+                                  {item.spiceLevel}
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <div className="mt-4">
+                              <input
+                                value={note}
+                                onChange={(e) =>
+                                  setNoteMap((prev) => ({
+                                    ...prev,
+                                    [key]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Add note: less spicy, no onion..."
+                                className="w-full rounded-2xl border px-3 py-2.5 text-sm outline-none"
+                                style={{ borderColor: theme.border, color: theme.text, background: '#fffaf8' }}
+                              />
+                            </div>
+
+                            <div className="mt-4 flex items-center justify-between gap-3">
+                              <div className="flex items-center rounded-full border p-1" style={{ borderColor: theme.border }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setQty(key, qty - 1)}
+                                  className="h-9 w-9 rounded-full text-base font-semibold"
+                                  style={{ color: theme.text }}
+                                >
+                                  −
+                                </button>
+                                <span className="min-w-[2rem] text-center text-sm font-semibold" style={{ color: theme.text }}>
+                                  {qty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setQty(key, qty + 1)}
+                                  className="h-9 w-9 rounded-full text-base font-semibold"
+                                  style={{ color: theme.text }}
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => onOrderItem(item, Math.max(1, qty || 1), note)}
+                                className="rounded-full px-4 py-2.5 text-sm font-semibold text-white"
+                                style={{ background: theme.bubble }}
+                              >
+                                {qty > 0 ? `Add ${qty}` : 'Order now'}
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t px-4 py-3 md:px-6" style={{ borderColor: theme.border, background: 'rgba(255,255,255,0.85)' }}>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold" style={{ color: theme.text }}>
+                {totalItems} item{totalItems !== 1 ? 's' : ''} selected
+              </p>
+              <p className="text-xs" style={{ color: theme.muted }}>
+                Estimated subtotal ₹{totalAmount.toLocaleString('en-IN')}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full px-4 py-2 text-sm font-medium"
+              style={{ background: theme.chip, color: theme.text }}
+            >
+              Continue chatting
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function OrderCardBubble({ order }: { order: NonNullable<Message['orderCard']> }) {
+  return (
+    <div
+      className="overflow-hidden rounded-[24px] border"
+      style={{
+        background: '#fff',
+        borderColor: '#f0c8bf',
+        boxShadow: '0 8px 28px rgba(243,129,96,0.14)',
+        maxWidth: 280,
+      }}
+    >
+      {/* Image */}
+      {order.imageUrl ? (
+        <div className="aspect-[16/9] w-full overflow-hidden bg-gradient-to-br from-orange-50 to-rose-50">
+          <img
+            src={order.imageUrl}
+            alt={order.name}
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ) : (
+        <div
+          className="flex aspect-[16/9] w-full items-center justify-center text-3xl"
+          style={{ background: 'linear-gradient(135deg,#fff4ec,#ffe8f4)' }}
+        >
+          🍽️
+        </div>
+      )}
+
+      <div className="p-3">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold" style={{ color: '#261815' }}>
+              {order.name}
+            </p>
+            {order.description ? (
+              <p className="mt-0.5 line-clamp-2 text-xs leading-4" style={{ color: '#7a5a53' }}>
+                {order.description}
+              </p>
+            ) : null}
+          </div>
+
+          {order.isVeg !== undefined ? (
+            <span
+              className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+              style={{
+                background: order.isVeg ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                color: order.isVeg ? '#15803d' : '#b91c1c',
+              }}
+            >
+              {order.isVeg ? 'VEG' : 'NON-VEG'}
+            </span>
+          ) : null}
+        </div>
+
+        {/* Meta chips */}
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {order.category ? (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize"
+              style={{ background: '#fff0ea', color: '#ea5d28', border: '1px solid #ffd3c8' }}
+            >
+              {order.category}
+            </span>
+          ) : null}
+          {order.prepTime ? (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{ background: '#f8f8f8', color: '#7a5a53', border: '1px solid #f0c8bf' }}
+            >
+              ⏱ {order.prepTime}
+            </span>
+          ) : null}
+        </div>
+
+        {/* Divider */}
+        <div className="my-2.5 h-px" style={{ background: '#f0c8bf' }} />
+
+        {/* Price + qty row */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-base font-bold" style={{ color: '#ea5d28' }}>
+              ₹{(order.price * order.qty).toLocaleString('en-IN')}
+            </span>
+            {order.qty > 1 ? (
+              <span className="ml-1 text-xs" style={{ color: '#b58c84' }}>
+                ({order.qty} × ₹{order.price.toLocaleString('en-IN')})
+              </span>
+            ) : null}
+          </div>
+
+          <span
+            className="rounded-full px-3 py-1 text-xs font-semibold text-white"
+            style={{ background: 'linear-gradient(135deg,#ff824d,#ea4f89)' }}
+          >
+            Ordered ✓
+          </span>
+        </div>
+
+        {/* Note */}
+        {order.note ? (
+          <p className="mt-2 rounded-xl px-2.5 py-1.5 text-xs" style={{ background: '#fff8f4', color: '#7a5a53', border: '1px solid #f0c8bf' }}>
+            📝 {order.note}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -476,30 +968,36 @@ function MessageBubble({
 
   return (
     <div className={cx('flex w-full', guest ? 'justify-end' : 'justify-start')}>
-      <div className="max-w-[80%]">
+      <div className="max-w-[82%]">
         {!guest && message.senderName ? (
-          <p className="mb-1 px-1 text-[11px] font-medium uppercase tracking-[0.14em]" style={{ color: palette.faint }}>
+          <p
+            className="mb-1 px-1 text-[11px] font-medium uppercase tracking-[0.14em]"
+            style={{ color: theme.faint }}
+          >
             {message.senderName}
           </p>
         ) : null}
 
         <div
-          className="rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm"
+          className={
+            message.orderCard
+              ? 'overflow-hidden rounded-[24px] shadow-sm'
+              : 'rounded-[24px] px-4 py-3 text-sm leading-6 shadow-sm'
+          }
           style={
-            guest
-              ? {
-                background: palette.primary,
-                color: '#fff',
-                borderBottomRightRadius: 8,
-              }
+            message.orderCard
+              ? { background: 'transparent' }
+              : guest
+              ? { background: theme.bubble, color: '#fff', borderBottomRightRadius: 8 }
               : {
-                background: palette.surface,
-                color: palette.text,
-                border: `1px solid ${palette.border}`,
-                borderBottomLeftRadius: 8,
-              }
+                  background: 'rgba(255,255,255,0.92)',
+                  color: theme.text,
+                  border: `1px solid ${theme.border}`,
+                  borderBottomLeftRadius: 8,
+                }
           }
         >
+          {/* Image */}
           {message.type === 'image' && message.imageUrl ? (
             <img
               src={message.thumbUrl || message.imageUrl}
@@ -508,33 +1006,37 @@ function MessageBubble({
             />
           ) : null}
 
-          {message.text ? <p style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{message.text}</p> : null}
-
-          {message.actionResult ? (
-            <div
-              className="mt-3 rounded-xl border px-3 py-2 text-xs"
-              style={{
-                borderColor: guest ? 'rgba(255,255,255,0.2)' : palette.border,
-                background: guest ? 'rgba(255,255,255,0.08)' : palette.surfaceSoft,
-              }}
-            >
-              <span className="font-semibold">{message.actionResult.type}</span>
-              {message.actionResult.summary ? ` · ${message.actionResult.summary}` : ''}
-              {typeof message.actionResult.total === 'number'
-                ? ` · ₹${message.actionResult.total.toLocaleString('en-IN')}`
-                : ''}
-            </div>
+          {/* Order card OR plain text — never both */}
+          {message.orderCard ? (
+            <OrderCardBubble order={message.orderCard} />
+          ) : message.text ? (
+            <p style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {message.text}
+            </p>
           ) : null}
         </div>
 
-        <div className={cx('mt-1 flex items-center gap-2 px-1 text-[11px]', guest ? 'justify-end' : 'justify-start')} style={{ color: palette.faint }}>
+        {/* Checkout overdue action card — rendered outside the bubble */}
+        {message.action?.type === 'checkout_overdue' && (
+          <CheckoutOverdueCard action={message.action as any} />
+        )}
+
+        {/* Timestamp + status */}
+        <div
+          className={cx(
+            'mt-1 flex items-center gap-2 px-1 text-[11px]',
+            guest ? 'justify-end' : 'justify-start'
+          )}
+          style={{ color: theme.faint }}
+        >
           <span>{formatTime(message.timestamp)}</span>
           {guest ? <span>{message.status || 'sent'}</span> : null}
           {message.status === 'failed' ? (
             <button
+              type="button"
               onClick={() => onRetry(message.id)}
-              className="font-medium underline"
-              style={{ color: palette.danger }}
+              className="underline"
+              style={{ color: theme.red }}
             >
               Retry
             </button>
@@ -563,11 +1065,10 @@ function Composer({
   onUploadImage: (file: File) => Promise<void>;
 }) {
   const fileRef = useRef<HTMLInputElement | null>(null);
-
   const canSend = (!!value.trim() || !!pendingImage) && !sending;
 
   return (
-    <footer className="border-t p-3 md:p-4" style={{ borderColor: palette.border, background: palette.surfaceSoft }}>
+    <div className="border-t p-4" style={{ borderColor: theme.border, background: 'rgba(255,255,255,0.76)' }}>
       <input
         ref={fileRef}
         type="file"
@@ -576,47 +1077,38 @@ function Composer({
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (!file) return;
-
-          if (!ALLOWED_TYPES.includes(file.type)) {
-            alert('Only JPEG, PNG, WebP, GIF and HEIC images are allowed');
-            return;
-          }
-
-          if (file.size > MAX_SIZE) {
-            alert('Image must be under 5 MB');
-            return;
-          }
-
+          if (!ALLOWED_TYPES.includes(file.type)) return alert('Only image files are allowed');
+          if (file.size > MAX_SIZE) return alert('Image must be under 5 MB');
           setPendingImage(file);
           e.currentTarget.value = '';
         }}
       />
 
       {pendingImage ? (
-        <div
-          className="mb-3 flex items-center justify-between rounded-2xl border px-3 py-3"
-          style={{ borderColor: palette.border, background: palette.surface }}
-        >
+        <div className="mb-3 flex items-center justify-between rounded-3xl border p-3" style={{ borderColor: theme.border, background: '#fff' }}>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium" style={{ color: palette.text }}>
+            <p className="truncate text-sm font-medium" style={{ color: theme.text }}>
               {pendingImage.name}
             </p>
-            <p className="text-xs" style={{ color: palette.muted }}>
+            <p className="text-xs" style={{ color: theme.muted }}>
               {(pendingImage.size / 1024).toFixed(0)} KB
             </p>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex gap-2">
             <button
+              type="button"
               onClick={() => setPendingImage(null)}
               className="rounded-xl border px-3 py-2 text-sm"
-              style={{ borderColor: palette.border, color: palette.muted }}
+              style={{ borderColor: theme.border }}
             >
               Remove
             </button>
             <button
+              type="button"
               onClick={() => pendingImage && onUploadImage(pendingImage)}
               className="rounded-xl px-3 py-2 text-sm font-medium text-white"
-              style={{ background: palette.primary }}
+              style={{ background: theme.bubble }}
             >
               Send image
             </button>
@@ -624,15 +1116,12 @@ function Composer({
         </div>
       ) : null}
 
-      <div
-        className="flex items-end gap-2 rounded-[22px] border bg-white p-2"
-        style={{ borderColor: palette.border }}
-      >
+      <div className="flex items-end gap-2 rounded-[28px] border p-2 shadow-sm" style={{ borderColor: '#efc4b7', background: '#fff' }}>
         <button
-          onClick={() => fileRef.current?.click()}
-          className="h-10 w-10 rounded-xl border text-sm"
-          style={{ borderColor: palette.border, color: palette.muted }}
           type="button"
+          onClick={() => fileRef.current?.click()}
+          className="h-11 w-11 rounded-2xl text-lg text-white"
+          style={{ background: theme.bubble }}
         >
           +
         </button>
@@ -641,9 +1130,9 @@ function Composer({
           rows={1}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Message the hotel"
-          className="max-h-28 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none"
-          style={{ color: palette.text }}
+          placeholder="Type your request..."
+          className="min-h-[44px] max-h-28 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none"
+          style={{ color: theme.text }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -653,31 +1142,27 @@ function Composer({
         />
 
         <button
+          type="button"
           onClick={onSend}
           disabled={!canSend}
-          className="h-10 rounded-xl px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ background: palette.primary }}
-          type="button"
+          className="h-11 rounded-2xl px-5 text-sm font-semibold text-white disabled:opacity-50"
+          style={{ background: theme.bubble }}
         >
           {sending ? 'Sending...' : 'Send'}
         </button>
       </div>
-
-      <p className="mt-2 text-center text-[11px]" style={{ color: palette.faint }}>
-        Press Enter to send · Shift+Enter for new line
-      </p>
-    </footer>
+    </div>
   );
 }
 
 function LinkExpired() {
   return (
-    <div className="flex min-h-screen items-center justify-center px-6" style={{ background: palette.bg }}>
-      <div className="w-full max-w-md rounded-3xl border p-8 text-center shadow-sm" style={{ borderColor: palette.border, background: palette.surface }}>
-        <h1 className="text-xl font-semibold" style={{ color: palette.text }}>
+    <div className="flex min-h-screen items-center justify-center px-6" style={{ background: theme.bg }}>
+      <div className="w-full max-w-md rounded-[32px] border p-8 text-center" style={{ background: '#fff', borderColor: theme.border }}>
+        <h1 className="text-xl font-semibold" style={{ color: theme.text }}>
           This guest link has expired
         </h1>
-        <p className="mt-3 text-sm leading-6" style={{ color: palette.muted }}>
+        <p className="mt-3 text-sm" style={{ color: theme.muted }}>
           Please contact reception or request a new guest chat link.
         </p>
       </div>
@@ -694,8 +1179,6 @@ export default function GuestChatPage({
   const {
     loading,
     expired,
-    error,
-    setError,
     conversationId,
     hotelName,
     roomNumber,
@@ -705,259 +1188,195 @@ export default function GuestChatPage({
   } = useGuestAccess(token);
 
   const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
 
-  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const onSocketMessage = useCallback((raw: any) => {
-    const incoming = toMessage({
-      _id: raw?._id || raw?.id,
-      id: raw?.id,
-      senderType: raw?.senderType || raw?.role || 'staff',
-      text: raw?.text,
-      messageType: raw?.messageType || raw?.type,
-      actionResult: raw?.actionResult,
-      imageUrl: raw?.imageUrl || raw?.mediaUrl,
-      thumbUrl: raw?.thumbUrl,
-      imageName: raw?.imageName,
-      createdAt: raw?.createdAt,
-      senderName: raw?.senderName,
-      status: raw?.status || 'delivered',
-    });
+  const { menuLoading, menuItems, menuOpen, setMenuOpen, fetchMenu } = useGuestMenu(token);
 
-    setMessages((prev) => {
-      const exists = prev.some((m) => m.id === incoming.id);
-      if (exists) return prev;
-      return [...prev, incoming];
-    });
+  // In GuestChatPage:
+  useGuestPolling(token, conversationId, setMessages, messages);
 
-    setIsTyping(false);
-  }, [setMessages]);
+  // ── Auto checkout overdue alert ────────────────────────────────────────────
+  useEffect(() => {
+    if (!token || !conversationId) return;
 
-  const onSocketTyping = useCallback(() => {
-    setIsTyping(true);
-    if (typingTimer.current) clearTimeout(typingTimer.current);
-    typingTimer.current = setTimeout(() => setIsTyping(false), 2500);
-  }, []);
+    const checkOverdue = async () => {
+      try {
+        // Ask backend: is this reservation overdue?
+        const res = await apiFetch<{ success: boolean; data: { isOverdue: boolean; minutesLate: number; roomNumber: string } }>(
+          `/api/chatbot/guest/status?token=${encodeURIComponent(token)}`
+        );
+        const { isOverdue, minutesLate, roomNumber: room } = res?.data ?? {};
+        if (!isOverdue) return;
 
-  const onSocketError = useCallback((payload: any) => {
-    setError(payload?.message || 'Socket error');
-    setSending(false);
-  }, [setError]);
+        // Idempotency — one alert per day per token
+        const alertKey = `overdue_sent_${token}_${new Date().toDateString()}`;
+        if (sessionStorage.getItem(alertKey)) return;
+        sessionStorage.setItem(alertKey, '1');
 
+        // 1. Send WhatsApp via notification API
+        await apiFetch(`/api/chatbot/guest/notify-overdue`, {
+          method: 'POST',
+          body: JSON.stringify({ token }),
+        });
 
-  const { connected, ready, socketRef } = useGuestSocket({
-    token,
-    conversationId,
-    onMessage: onSocketMessage,
-    onTyping: onSocketTyping,
-    onError: onSocketError,
-  });
+        // 2. Post bot message into this conversation
+        await apiFetch(`/api/chatbot/guest/message`, {
+          method: 'POST',
+          body: JSON.stringify({
+            token,
+            text:
+              `⏰ *Checkout Overdue — Room ${room}*\n\n` +
+              `Your checkout was due at *11:00 AM* and you are now ` +
+              `*${minutesLate >= 60 ? `${Math.floor(minutesLate / 60)}h ${minutesLate % 60}m` : `${minutesLate}m`} overdue*.\n\n` +
+              `Please visit the front desk or use the options below. 🙏`,
+            trigger: 'checkout_overdue',
+          }),
+        });
+      } catch (e) {
+        console.warn('Overdue check failed', e);
+      }
+    };
 
-
-  useGuestPolling({
-    enabled: !!conversationId && !connected,
-    token,
-    conversationId,
-    setMessages,
-  });
+    checkOverdue(); // run immediately on load
+    const interval = setInterval(checkOverdue, 30 * 60 * 1000); // then every 30 min
+    return () => clearInterval(interval);
+  }, [token, conversationId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  }, [messages]);
 
   const groupedMessages = useMemo(() => {
     const groups: Array<{ label: string; items: Message[] }> = [];
     for (const msg of messages) {
       const label = msg.timestamp.toDateString();
       const last = groups[groups.length - 1];
-      if (last?.label === label) {
-        last.items.push(msg);
-      } else {
-        groups.push({ label, items: [msg] });
-      }
+      if (last?.label === label) last.items.push(msg);
+      else groups.push({ label, items: [msg] });
     }
     return groups;
   }, [messages]);
-
-  const sendText = useCallback(async () => {
-    const text = input.trim();
+  // ─── REPLACE sendText ─────────────────────────────────────────────────────────
+  const sendText = useCallback(async (prefilled?: string) => {
+    const text = prefilled ?? input.trim();
     if (!text || sending) return;
-
     const tempId = genId();
     setSending(true);
     setInput('');
-
-    setMessages((prev) => [
+    setMessages(prev => [
       ...prev,
-      {
-        id: tempId,
-        role: 'guest',
-        text,
-        timestamp: new Date(),
-        type: 'text',
-        status: 'sending',
-      },
+      { id: tempId, role: 'guest', text, timestamp: new Date(), type: 'text', status: 'sending' },
     ]);
-
-    if (socketRef.current?.connected && ready) {
-      socketRef.current.timeout(5000).emit(
-        'chat:guest_message',
-        { text },
-        (err: any, res: any) => {
-          if (err || !res?.success) {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === tempId ? { ...m, status: 'failed' } : m
-              )
-            );
-            setSending(false);
-            return;
-          }
-
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === tempId
-                ? { ...m, id: res.messageId || m.id, status: 'delivered' }
-                : m
-            )
-          );
-          setSending(false);
-        }
-      );
-
-      return;
-    }
-
     try {
       const res = await apiFetch<any>('/api/chatbot/guest/message', {
         method: 'POST',
         body: JSON.stringify({ token, text }),
       });
-
-      const savedId = res?.data?._id || res?.data?.id || tempId;
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === tempId ? { ...m, id: savedId, status: 'delivered' } : m
-        )
-      );
-    } catch (err: any) {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, status: 'failed' } : m))
-      );
-      setError(err?.message || 'Failed to send message');
+      // FIX: _id first (MongoDB), then id, then fallback
+      const savedId = res?.data?.message?._id ?? res?.data?.message?.id ?? tempId;
+      setMessages(prev => {
+        const withoutTemp = prev.filter(m => m.id !== tempId);
+        const alreadyExists = withoutTemp.some(m => m.id === savedId);
+        if (alreadyExists) return withoutTemp.map(m => m.id === savedId ? { ...m, status: 'delivered' as const } : m);
+        return prev.map(m => m.id === tempId ? { ...m, id: savedId, status: 'delivered' as const } : m);
+      });
+    } catch {
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' as const } : m));
     } finally {
       setSending(false);
     }
-  }, [input, sending, token, ready, setMessages, setError, socketRef]);
+  }, [input, sending, token, setMessages]);
 
   const retryMessage = useCallback((id: string) => {
     const failed = messages.find((m) => m.id === id);
     if (!failed?.text) return;
-
     setMessages((prev) => prev.filter((m) => m.id !== id));
     setInput(failed.text);
-  }, [messages]);
+  }, [messages, setMessages]);
 
   const uploadImage = useCallback(async (file: File) => {
     if (sending) return;
-
     const tempId = genId();
     const preview = URL.createObjectURL(file);
-
     setSending(true);
     setPendingImage(null);
-
-    setMessages((prev) => [
+    setMessages(prev => [
       ...prev,
-      {
-        id: tempId,
-        role: 'guest',
-        text: '',
-        timestamp: new Date(),
-        type: 'image',
-        imageUrl: preview,
-        imageName: file.name,
-        status: 'sending',
-      },
+      { id: tempId, role: 'guest', text: '', timestamp: new Date(), type: 'image', imageUrl: preview, imageName: file.name, status: 'sending' },
     ]);
-
     try {
       const form = new FormData();
       form.append('image', file);
       form.append('token', token);
-
       const uploadRes = await fetch(`${API_URL}/api/chatbot/upload-image`, {
         method: 'POST',
         body: form,
       });
-
       const uploadJson = await uploadRes.json().catch(() => null);
-
-      if (!uploadRes.ok || !uploadJson?.success) {
-        throw new Error(uploadJson?.message || 'Image upload failed');
-      }
-
-      const { url, thumbUrl } = uploadJson.data || {};
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === tempId
-            ? { ...m, imageUrl: url, thumbUrl, status: 'sending' }
-            : m
-        )
-      );
-
-      if (socketRef.current?.connected && ready) {
-        socketRef.current.timeout(5000).emit(
-          'chat:guest_message',
-          {
-            text: '[image]',
-            imageUrl: url,
-            thumbUrl,
-            messageType: 'image',
-          },
-          (err: any, res: any) => {
-            if (err || !res?.success) {
-              setMessages((prev) =>
-                prev.map((m) => (m.id === tempId ? { ...m, status: 'failed' } : m))
-              );
-              setSending(false);
-              return;
-            }
-
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === tempId
-                  ? { ...m, id: res.messageId || m.id, status: 'delivered' }
-                  : m
-              )
-            );
-            setSending(false);
-          }
-        );
-      }
-    } catch (err: any) {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, status: 'failed' } : m))
-      );
-      setError(err?.message || 'Failed to upload image');
+      if (!uploadRes.ok || !uploadJson?.success) throw new Error(uploadJson?.message ?? 'Image upload failed');
+      const { url, thumbUrl } = uploadJson.data;
+      // FIX: use apiFetch correctly + _id first
+      const saveRes = await apiFetch<any>('/api/chatbot/guest/message', {
+        method: 'POST',
+        body: JSON.stringify({ token, messageType: 'image', imageUrl: url, thumbUrl, imageName: file.name, text: 'image' }),
+      });
+      const savedId = saveRes?.data?.message?._id ?? saveRes?.data?.message?.id ?? tempId;
+      setMessages(prev => prev.map(m => m.id === tempId
+        ? { ...m, id: savedId, imageUrl: url, thumbUrl, status: 'delivered' as const }
+        : m
+      ));
+    } catch {
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' as const } : m));
     } finally {
       URL.revokeObjectURL(preview);
       setSending(false);
     }
-  }, [conversationId, sending, setError, setMessages, socketRef, token]);
+  }, [sending, token, setMessages]);
+
+  const handleMenuOrder = useCallback(async (item: MenuItem, qty = 1, note = '') => {
+    setMenuOpen(false);
+    const tempId = genId();
+    const noteText = note.trim() ? ` Note: ${note.trim()}.` : '';
+    const text = `I would like to order ${qty}× ${item.name} for ₹${item.price * qty}.${noteText}`;
+    setSending(true);
+    setMessages(prev => [
+      ...prev,
+      {
+        id: tempId, role: 'guest', text, timestamp: new Date(), type: 'text', status: 'sending',
+        orderCard: {
+          name: item.name, price: item.price, qty, note: note.trim() || undefined,
+          imageUrl: item.imageUrl, category: item.category, isVeg: item.isVeg,
+          description: item.description, prepTime: item.prepTime
+        },
+      },
+    ]);
+    try {
+      // FIX: correct apiFetch call + _id first
+      const res = await apiFetch<any>('/api/chatbot/guest/message', {
+        method: 'POST',
+        body: JSON.stringify({ token, text }),
+      });
+      const savedId = res?.data?.message?._id ?? res?.data?.message?.id ?? tempId;
+      setMessages(prev => prev.map(m => m.id === tempId
+        ? { ...m, id: savedId, status: 'delivered' as const }
+        : m
+      ));
+    } catch {
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' as const } : m));
+    } finally {
+      setSending(false);
+    }
+  }, [setMenuOpen, token, setMessages, setSending]);
 
   if (expired) return <LinkExpired />;
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: palette.bg }}>
-        <div className="rounded-3xl border px-6 py-5 text-sm" style={{ borderColor: palette.border, background: palette.surface, color: palette.muted }}>
+      <div className="flex min-h-screen items-center justify-center" style={{ background: theme.bg }}>
+        <div className="rounded-3xl border px-6 py-5 text-sm" style={{ background: '#fff', borderColor: theme.border, color: theme.muted }}>
           Loading guest concierge...
         </div>
       </div>
@@ -965,60 +1384,46 @@ export default function GuestChatPage({
   }
 
   return (
-    <main className="min-h-screen md:h-screen" style={{ background: palette.bg }}>
-      <div className="mx-auto flex h-screen max-w-6xl overflow-hidden md:border-x" style={{ borderColor: palette.border }}>
-        <section className="flex min-w-0 flex-1 flex-col">
-          <Header
-            hotelName={hotelName}
-            guestName={guestName}
-            roomNumber={roomNumber}
-            connected={connected}
-          />
+    <main className="min-h-screen md:h-screen" style={{ background: theme.bg }}>
+      <div className="mx-auto flex h-screen max-w-6xl p-3 md:p-5">
+        <section
+          className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[34px] border"
+          style={{
+            background: theme.panel,
+            borderColor: 'rgba(255,255,255,0.45)',
+            boxShadow: theme.shadow,
+            backdropFilter: 'blur(18px)',
+          }}
+        >
+          <Header hotelName={hotelName} guestName={guestName} roomNumber={roomNumber} />
 
-          {error ? (
-            <div className="border-b px-4 py-3 text-sm" style={{ borderColor: '#f3caca', background: '#fff1f1', color: palette.danger }}>
-              {error}
-              <button
-                onClick={() => setError(null)}
-                className="ml-3 underline"
-              >
-                Dismiss
-              </button>
-            </div>
-          ) : null}
+          <div className="border-b px-4 py-4 md:px-6" style={{ borderColor: '#f3d8d1', background: 'rgba(255,248,245,0.72)' }}>
+            <ServiceCards
+              onOpenMenu={fetchMenu}
+              onPick={(value) => setInput(value)}
+            />
+          </div>
 
-          <section className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6" style={{ background: palette.bg }}>
-            {messages.length === 0 ? <EmptyState hotelName={hotelName} /> : null}
-
+          <section className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
             <div className="space-y-6">
               {groupedMessages.map((group) => (
                 <div key={group.label}>
                   <div className="mb-4 flex items-center gap-3">
-                    <div className="h-px flex-1" style={{ background: palette.border }} />
-                    <span className="text-[11px] font-medium uppercase tracking-[0.16em]" style={{ color: palette.faint }}>
+                    <div className="h-px flex-1" style={{ background: '#edd4cc' }} />
+                    <span className="text-[11px] font-medium uppercase tracking-[0.16em]" style={{ color: theme.faint }}>
                       {group.label}
                     </span>
-                    <div className="h-px flex-1" style={{ background: palette.border }} />
+                    <div className="h-px flex-1" style={{ background: '#edd4cc' }} />
                   </div>
 
                   <div className="space-y-4">
                     {group.items.map((message) => (
-                      <MessageBubble
-                        key={message.id}
-                        message={message}
-                        onRetry={retryMessage}
-                      />
+                      <MessageBubble key={message.id} message={message} onRetry={retryMessage} />
                     ))}
                   </div>
                 </div>
               ))}
             </div>
-
-            {isTyping ? (
-              <div className="mt-4 text-sm" style={{ color: palette.muted }}>
-                Hotel team is typing...
-              </div>
-            ) : null}
 
             <div ref={bottomRef} />
           </section>
@@ -1026,11 +1431,19 @@ export default function GuestChatPage({
           <Composer
             value={input}
             setValue={setInput}
-            onSend={sendText}
+            onSend={() => sendText()}
             sending={sending}
             pendingImage={pendingImage}
             setPendingImage={setPendingImage}
             onUploadImage={uploadImage}
+          />
+
+          <MenuSheet
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            loading={menuLoading}
+            items={menuItems}
+            onOrderItem={handleMenuOrder}
           />
         </section>
       </div>

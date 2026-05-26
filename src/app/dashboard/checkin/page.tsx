@@ -88,20 +88,20 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const TIER_COLORS: Record<string, { bg: string; text: string; emoji: string }> = {
-  bronze:   { bg: '#fdf3e8', text: '#92400e', emoji: '🥉' },
-  silver:   { bg: '#f1f5f9', text: '#475569', emoji: '🥈' },
-  gold:     { bg: '#fefce8', text: '#854d0e', emoji: '🥇' },
+  bronze: { bg: '#fdf3e8', text: '#92400e', emoji: '🥉' },
+  silver: { bg: '#f1f5f9', text: '#475569', emoji: '🥈' },
+  gold: { bg: '#fefce8', text: '#854d0e', emoji: '🥇' },
   platinum: { bg: '#f5f3ff', text: '#5b21b6', emoji: '💎' },
 };
 
 const ID_TYPES = [
-  { value: 'aadhaar',          label: '🪪 Aadhaar'  },
-  { value: 'passport',         label: '📕 Passport'  },
-  { value: 'driving_licence',  label: '🚗 DL'        },
-  { value: 'pan',              label: '💳 PAN'       },
-  { value: 'voter_id',         label: '🗳️ Voter ID' },
-  { value: 'foreign_passport', label: '🌍 Foreign'   },
-  { value: 'other',            label: '📄 Other'     },
+  { value: 'aadhaar', label: '🪪 Aadhaar' },
+  { value: 'passport', label: '📕 Passport' },
+  { value: 'driving_licence', label: '🚗 DL' },
+  { value: 'pan', label: '💳 PAN' },
+  { value: 'voter_id', label: '🗳️ Voter ID' },
+  { value: 'foreign_passport', label: '🌍 Foreign' },
+  { value: 'other', label: '📄 Other' },
 ];
 
 const inp =
@@ -116,9 +116,9 @@ function VerifyIDModal({
   onClose: () => void;
   onVerified: () => void;
 }) {
-  const [idType,   setIdType]   = useState('aadhaar');
+  const [idType, setIdType] = useState('aadhaar');
   const [idNumber, setIdNumber] = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [loading, setLoading] = useState(false);
   if (!reservation) return null;
 
   async function verify() {
@@ -320,19 +320,20 @@ function CheckoutModal({
 function CheckinSuccessModal({
   data, guestPhone, guestName, roomNumber, onClose,
 }: {
-  data: { folioId: string; chatLink: string };
+  data: { folioId: string; chatLink: string; conversationId?: string };
   guestPhone: string;
   guestName: string;
   roomNumber: string;
   onClose: () => void;
 }) {
   const waMessage =
-    `🏨 *Welcome to the hotel, ${guestName}!*\n\n` +
+    `🏨 *Welcome, ${guestName}!*\n\n` +
     `You are now checked into *Room ${roomNumber}*.\n\n` +
-    `💬 *Chat with your personal concierge anytime:*\n${data.chatLink}\n\n` +
-    `You can order room service, request housekeeping, report issues, and more — all from this link.\n\n` +
-    `_We hope you have a wonderful stay!_ 🌟`;
-
+    `Chat with your personal concierge anytime:\n` +
+    `👇 ${data.chatLink}\n\n` +
+    `Order room service, request housekeeping, and more — *no app needed*.\n\n` +
+    `We hope you have a wonderful stay! 🙏`;
+  const router = useRouter()
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
@@ -356,7 +357,7 @@ function CheckinSuccessModal({
               className="flex w-full items-center justify-center gap-2.5 py-3 rounded-2xl text-sm font-bold text-white transition-all hover:opacity-90"
               style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', boxShadow: '0 4px 14px rgba(34,197,94,0.3)' }}>
               <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
               </svg>
               Send Concierge Link via WhatsApp
             </button>
@@ -373,6 +374,19 @@ function CheckinSuccessModal({
             className="w-full py-3 rounded-2xl text-sm text-gray-400 hover:text-gray-600 transition-colors">
             Done
           </button>
+          {data.conversationId && (
+            <button
+              onClick={() => {
+                onClose();
+                router.push('/dashboard/guest-operations');
+                // selectedId will auto-select via URL state or pass via context
+              }}
+              className="flex w-full items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold border"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Open in Guest Operations
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -381,32 +395,33 @@ function CheckinSuccessModal({
 
 // ── Reservation Card ──────────────────────────────────────────────────────────
 function ReservationCard({
-  res, type, onCheckin, onCheckout, onVerify, onViewFolio, onCForm,
+  res, type, onCheckin, onCheckout, onVerify, onViewFolio, onCForm, checkingInId,
 }: {
   res: Reservation;
   type: 'arrival' | 'inhouse' | 'departure';
-  onCheckin:  (r: Reservation) => void;
+  onCheckin: (r: Reservation) => void;
   onCheckout: (r: Reservation) => void;
-  onVerify:   (r: Reservation) => void;
-  onViewFolio:(r: Reservation) => void;
-  onCForm:    (r: Reservation) => void;
+  onVerify: (r: Reservation) => void;
+  onViewFolio: (r: Reservation) => void;
+  onCForm: (r: Reservation) => void;
+  checkingInId: string | null;   // ✅ add this
 }) {
   const router = useRouter();
   const idOk = res.idVerified || res.guestId?.idVerified;
   const balance = res.folioId?.balance ?? res.balanceDue ?? 0;
   const tier = res.guestId?.loyalty?.tier;
   const tierCfg = tier ? TIER_COLORS[tier] : null;
-
+  const isCheckingIn = checkingInId === res._id;
   const borderColor =
     type === 'departure' && balance > 0 ? '#fecaca' :
-    !idOk && type === 'arrival'         ? '#fde68a' :
-    type === 'arrival'                  ? '#bbf7d0' :
-    type === 'inhouse'                  ? '#bfdbfe' : '#e5e7eb';
+      !idOk && type === 'arrival' ? '#fde68a' :
+        type === 'arrival' ? '#bbf7d0' :
+          type === 'inhouse' ? '#bfdbfe' : '#e5e7eb';
 
   const accentGrad =
-    type === 'arrival'   ? 'linear-gradient(135deg,#22c55e,#16a34a)' :
-    type === 'inhouse'   ? 'linear-gradient(135deg,#3b82f6,#2563eb)' :
-                           'linear-gradient(135deg,#F97316,#F43F5E)';
+    type === 'arrival' ? 'linear-gradient(135deg,#22c55e,#16a34a)' :
+      type === 'inhouse' ? 'linear-gradient(135deg,#3b82f6,#2563eb)' :
+        'linear-gradient(135deg,#F97316,#F43F5E)';
 
   return (
     <div
@@ -539,7 +554,7 @@ function ReservationCard({
           <div className="flex items-center gap-2">
             {idOk
               ? <ShieldCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
-              : <ShieldAlert  className="w-4 h-4 text-amber-600 flex-shrink-0" />}
+              : <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />}
             <div>
               <p className="text-xs font-semibold" style={{ color: idOk ? '#166534' : '#92400e' }}>
                 {idOk ? 'ID Verified' : 'ID Pending'}
@@ -571,11 +586,18 @@ function ReservationCard({
               </button>
               <button
                 onClick={() => idOk && onCheckin(res)}
-                disabled={!idOk}
+                disabled={!idOk || isCheckingIn}
                 title={!idOk ? 'Verify ID before check-in' : undefined}
                 className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: idOk ? 'linear-gradient(135deg,#22c55e,#16a34a)' : '#e5e7eb', boxShadow: idOk ? '0 4px 12px rgba(34,197,94,0.3)' : 'none', color: idOk ? '#fff' : '#9ca3af' }}>
-                <LogIn className="w-3.5 h-3.5" /> Check In
+                style={{
+                  background: idOk ? 'linear-gradient(135deg,#22c55e,#16a34a)' : '#e5e7eb',
+                  boxShadow: idOk ? '0 4px 12px rgba(34,197,94,0.3)' : 'none',
+                  color: idOk ? '#fff' : '#9ca3af',
+                }}>
+                {isCheckingIn
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking in...</>
+                  : <><LogIn className="w-3.5 h-3.5" /> Check In</>
+                }
               </button>
             </>
           )}
@@ -588,11 +610,17 @@ function ReservationCard({
                 <ChevronRight className="w-3.5 h-3.5" /> View
               </button>
               {res.guestChatUrl && (
-                <button
-                  onClick={() => openWhatsApp(res.guestId.phone,
-                    `Here is your concierge chat link: ${res.guestChatUrl}`)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all flex-shrink-0">
-                  <MessageSquare className="w-3.5 h-3.5" /> Chat
+                // ✅ FIX — in ReservationCard inhouse section, regenerate link on demand
+                <button onClick={async () => {
+                  try {
+                    const r = await api.post(`/api/reservations/${res._id}/resend-chat-link`);
+                    openWhatsApp(res.guestId.phone,
+                      `Here is your concierge chat link: ${r.data.data.chatLink}`);
+                  } catch {
+                    toast.error('Could not generate chat link');
+                  }
+                }}>
+                  Chat
                 </button>
               )}
               <button
@@ -633,53 +661,71 @@ function ReservationCard({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CheckInPage() {
   const router = useRouter();
-  const qc     = useQueryClient();
+  const qc = useQueryClient();
 
-  const [search,         setSearch]         = useState('');
-  const [activeTab,      setActiveTab]       = useState<'arrivals' | 'inhouse' | 'departures'>('arrivals');
-  const [verifyRes,      setVerifyRes]       = useState<Reservation | null>(null);
-  const [checkoutRes,    setCheckoutRes]     = useState<Reservation | null>(null);
-  const [successData,    setSuccessData]     = useState<{ folioId: string; chatLink: string } | null>(null);
-  const [successMeta,    setSuccessMeta]     = useState<{ phone: string; name: string; room: string } | null>(null);
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'arrivals' | 'inhouse' | 'departures'>('arrivals');
+  const [verifyRes, setVerifyRes] = useState<Reservation | null>(null);
+  const [checkoutRes, setCheckoutRes] = useState<Reservation | null>(null);
+  const [successData, setSuccessData] = useState<{
+    folioId: string;
+    chatLink: string;
+    conversationId?: string;   // ✅ add
+  } | null>(null);
+  const [successMeta, setSuccessMeta] = useState<{ phone: string; name: string; room: string } | null>(null);
+  const [checkingInId, setCheckingInId] = useState<string | null>(null);
 
   const today = new Date().toISOString().split('T')[0];
 
   // ── Queries ─────────────────────────────────────────────────────────────────
-  const { data: arrivals,   isLoading: arrLoad,  refetch: refetchArr } = useQuery<Reservation[]>({
+  const { data: arrivals, isLoading: arrLoad, refetch: refetchArr } = useQuery<Reservation[]>({
     queryKey: ['checkin-arrivals', today],
-    queryFn:  () => api.get('/api/reservations/arrivals-today').then(r => r.data.data || []),
+    queryFn: () => api.get('/api/reservations/arrivals-today').then(r => r.data.data || []),
     refetchInterval: 60_000,
   });
 
-  const { data: inhouse,    isLoading: ihLoad,   refetch: refetchIH }  = useQuery<Reservation[]>({
+  const { data: inhouse, isLoading: ihLoad, refetch: refetchIH } = useQuery<Reservation[]>({
     queryKey: ['checkin-inhouse'],
-    queryFn:  () => api.get('/api/reservations/in-house').then(r => r.data.data || []),
+    queryFn: () => api.get('/api/reservations/in-house').then(r => r.data.data || []),
     refetchInterval: 60_000,
   });
 
-  const { data: departures, isLoading: depLoad,  refetch: refetchDep } = useQuery<Reservation[]>({
+  const { data: departures, isLoading: depLoad, refetch: refetchDep } = useQuery<Reservation[]>({
     queryKey: ['checkin-departures', today],
-    queryFn:  () => api.get('/api/reservations/departures-today').then(r => r.data.data || []),
+    queryFn: () => api.get('/api/reservations/departures-today').then(r => r.data.data || []),
     refetchInterval: 60_000,
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────
   const checkinMut = useMutation({
-    mutationFn: (id: string) => api.post(`/api/reservations/${id}/checkin`).then(r => r.data.data),
+    mutationFn: (id: string) =>
+      api.post(`/api/reservations/${id}/checkin`).then(r => r.data.data),
+
+    onMutate: (id) => {
+      setCheckingInId(id);   // ✅ start loader
+    },
+
     onSuccess: (data, id) => {
+      setCheckingInId(null);  // ✅ stop loader
       const res = arrivals?.find(r => r._id === id);
       if (res) {
-        setSuccessData(data);
+        setSuccessData({
+          folioId: data.folioId,
+          chatLink: data.chatLink ?? data.guestChatUrl ?? '',
+          conversationId: data.conversationId,
+        });
         setSuccessMeta({
           phone: res.guestId.phone,
-          name:  `${res.guestId.firstName} ${res.guestId.lastName}`,
-          room:  res.roomNumber,
+          name: `${res.guestId.firstName} ${res.guestId.lastName}`,
+          room: res.roomNumber,
         });
       }
       qc.invalidateQueries({ queryKey: ['checkin-arrivals'] });
       qc.invalidateQueries({ queryKey: ['checkin-inhouse'] });
     },
-    onError: (e: any) => {
+
+    onError: (e: any, id) => {
+      setCheckingInId(null);  // ✅ stop loader on error too
       const msg = e.response?.data?.message || 'Check-in failed';
       toast.error(msg.toLowerCase().includes('id') ? 'Verify guest ID first' : msg);
     },
@@ -704,9 +750,9 @@ export default function CheckInPage() {
     const q = search.toLowerCase();
     return list.filter(r =>
       r.guestId?.firstName?.toLowerCase().includes(q) ||
-      r.guestId?.lastName?.toLowerCase().includes(q)  ||
-      r.guestId?.phone?.includes(q)                   ||
-      r.bookingRef?.toLowerCase().includes(q)         ||
+      r.guestId?.lastName?.toLowerCase().includes(q) ||
+      r.guestId?.phone?.includes(q) ||
+      r.bookingRef?.toLowerCase().includes(q) ||
       r.roomNumber?.includes(q)
     );
   }
@@ -721,9 +767,9 @@ export default function CheckInPage() {
   }
 
   const tabData = {
-    arrivals:   { list: filterList(arrivals),    loading: arrLoad,  label: 'Arrivals',   iconColor: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0' },
-    inhouse:    { list: filterList(inhouse),     loading: ihLoad,   label: 'In-House',   iconColor: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' },
-    departures: { list: filterList(departures),  loading: depLoad,  label: 'Departures', iconColor: '#F97316', bg: '#fff7ed', border: '#fed7aa' },
+    arrivals: { list: filterList(arrivals), loading: arrLoad, label: 'Arrivals', iconColor: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0' },
+    inhouse: { list: filterList(inhouse), loading: ihLoad, label: 'In-House', iconColor: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe' },
+    departures: { list: filterList(departures), loading: depLoad, label: 'Departures', iconColor: '#F97316', bg: '#fff7ed', border: '#fed7aa' },
   };
 
   const current = tabData[activeTab];
@@ -765,8 +811,8 @@ export default function CheckInPage() {
             {/* Live counters */}
             <div className="flex gap-3 flex-wrap">
               {[
-                { label: 'Arrivals',   count: arrivals?.length   || 0, icon: <LogIn  className="w-3.5 h-3.5" />, color: 'rgba(134,239,172,0.25)' },
-                { label: 'In-House',   count: inhouse?.length    || 0, icon: <Home   className="w-3.5 h-3.5" />, color: 'rgba(147,197,253,0.25)' },
+                { label: 'Arrivals', count: arrivals?.length || 0, icon: <LogIn className="w-3.5 h-3.5" />, color: 'rgba(134,239,172,0.25)' },
+                { label: 'In-House', count: inhouse?.length || 0, icon: <Home className="w-3.5 h-3.5" />, color: 'rgba(147,197,253,0.25)' },
                 { label: 'Departures', count: departures?.length || 0, icon: <LogOut className="w-3.5 h-3.5" />, color: 'rgba(253,186,116,0.25)' },
               ].map(s => (
                 <div key={s.label}
@@ -932,6 +978,7 @@ export default function CheckInPage() {
                 onVerify={r => setVerifyRes(r)}
                 onViewFolio={r => router.push(`/dashboard/billing?reservationId=${r._id}`)}
                 onCForm={r => downloadCForm(r)}
+                checkingInId={checkingInId}
               />
             ))}
           </div>

@@ -348,32 +348,78 @@ export function CardContent({ children, className }: { children: React.ReactNode
 // ── Input ──────────────────────────────────────────────────────────────────────
 interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'prefix'> {
   label?: string;
+  hint?: string;
   error?: string;
   prefix?: React.ReactNode;
+  suffix?: React.ReactNode;
+  required?: boolean;
 }
+
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, prefix, className, ...props }, ref) => (
-    <div className="space-y-1">
-      {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
-      <div className="relative">
+  ({ label, hint, error, prefix, suffix, required, className, ...props }, ref) => (
+    <div className="space-y-1.5">
+      {/* Label row */}
+      {label && (
+        <div className="flex items-center justify-between gap-2">
+          <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {label}
+            {required && <span className="ml-1 text-orange-500">*</span>}
+          </label>
+          {hint && (
+            <span className="text-[11px] font-normal text-muted-foreground/70">{hint}</span>
+          )}
+        </div>
+      )}
+
+      {/* Input wrapper */}
+      <div className="relative flex items-center">
+        {/* Prefix */}
         {prefix && (
-          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400">
+          <div className="pointer-events-none absolute left-3 flex items-center text-muted-foreground">
             {prefix}
           </div>
         )}
+
         <input
           ref={ref}
           className={cn(
-            'block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm placeholder-gray-400',
-            'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors',
+            // base
+            'block w-full rounded-xl border bg-background text-sm text-foreground',
+            'px-3 py-2.5 transition-all duration-150 outline-none',
+            'placeholder:text-muted-foreground/60',
+            // default border + focus ring
+            'border-input',
+            'focus:border-transparent focus:ring-2 focus:ring-orange-400',
+            // prefix / suffix padding
             prefix && 'pl-9',
-            error && 'border-red-400 focus:ring-red-400',
+            suffix && 'pr-9',
+            // error state
+            error && 'border-red-400 bg-red-50/30 focus:ring-red-400',
+            // disabled state
+            'disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-secondary/50',
             className,
           )}
+          aria-invalid={!!error}
           {...props}
         />
+
+        {/* Suffix */}
+        {suffix && (
+          <div className="pointer-events-none absolute right-3 flex items-center text-muted-foreground">
+            {suffix}
+          </div>
+        )}
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+
+      {/* Error message */}
+      {error && (
+        <p className="flex items-center gap-1 text-xs font-medium text-red-500">
+          <svg className="h-3 w-3 flex-shrink-0" viewBox="0 0 12 12" fill="currentColor">
+            <path d="M6 1a5 5 0 1 0 0 10A5 5 0 0 0 6 1zm.5 7.5h-1v-1h1v1zm0-2h-1v-3h1v3z"/>
+          </svg>
+          {error}
+        </p>
+      )}
     </div>
   )
 );

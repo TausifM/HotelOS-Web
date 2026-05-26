@@ -122,24 +122,46 @@ export default function ReservationDetailPage() {
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['reservation', id] });
 
-  // ── Mutations ──────────────────────────────────────────────────────────────
   const checkinMutation = useMutation({
-    mutationFn: () => api.post(`/api/reservations/${id}/checkin`),
-    onSuccess: (data) => {
-      const link = data.data.data?.chatLink;
-      if (link) setChatLink(link);
-      toast.success('Guest checked in!');
-      refresh();
-      setShowCheckin(false);
+  mutationFn: () => api.post(`/api/reservations/${id}/checkin`),
+  onSuccess: (data) => {
+    const link = data.data.data?.chatLink;
+    if (link) setChatLink(link);
+    toast.success('Guest checked in!');
+    refresh();
+    setShowCheckin(false);
 
-      // Open WhatsApp with chat link
-      if (res?.guestId?.whatsappOptIn && (res?.guestId?.whatsappNumber || res?.guestId?.phone) && link) {
-        const msg = `🏨 *Welcome to ${res?.guestId?.firstName}!*\n\nYou're now checked in to Room ${res?.roomNumber}.\n\n💬 Chat with us anytime:\n${link}\n\nEnjoy your stay! 🌟`;
-        openWhatsApp(res.guestId.whatsappNumber || res.guestId.phone, msg);
-      }
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Check-in failed'),
-  });
+    // ✅ FIX 1: was `res?.guestId?.firstName` — welcome message used wrong field
+    // "Welcome to ${res?.guestId?.firstName}" → should be hotel name, not guest name
+    // ✅ FIX 2: phone number must be digits only — strip spaces/dashes for wa.me
+    // ✅ FIX 3: WhatsApp block should use `link` not stale `chatLink` state
+    if (
+      res?.guestId?.whatsappOptIn &&
+      (res?.guestId?.whatsappNumber || res?.guestId?.phone) &&
+      link
+    ) {
+      const hotelName = res?.tenantId?.hotelName ?? 'our hotel';
+      const guestName = `${res?.guestId?.firstName ?? 'Guest'} ${res?.guestId?.lastName ?? ''}`.trim();
+      const rawPhone  = (res?.guestId?.whatsappNumber || res?.guestId?.phone) as string;
+      const phone     = rawPhone.replace(/\D/g, '');   // strip non-digits for wa.me
+
+      const msg = [
+        `🏨 *Welcome to ${hotelName}, ${guestName}!*`,
+        ``,
+        `You're now checked in to Room *${res?.roomNumber}*.`,
+        ``,
+        `💬 Chat with us anytime:`,
+        link,                                           // ✅ FIX 3: uses fresh `link` not state
+        ``,
+        `Enjoy your stay! 🌟`,
+      ].join('\n');
+
+      openWhatsApp(phone, msg);
+    }
+  },
+  onError: (e: any) =>
+    toast.error(e.response?.data?.message || 'Check-in failed'),
+});
 
   const checkoutMutation = useMutation({
     mutationFn: () => api.post(`/api/reservations/${id}/checkout`),

@@ -9,7 +9,8 @@ import { formatCurrency, formatDate, RESERVATION_STATUS_COLORS } from '@/lib/uti
 import { cn } from '@/lib/utils';
 import {
   Plus, Search, Calendar, Home, LogIn, LogOut,
-  ChevronLeft, ChevronRight, Bed,
+  ChevronLeft, ChevronRight, Bed, Moon, AlertTriangle,
+  Clock, CheckCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -20,6 +21,88 @@ const FILTERS = [
   { label: 'Checked Out',  value: 'checked_out', icon: '🏁' },
   { label: 'Cancelled',    value: 'cancelled',   icon: '❌' },
 ];
+
+const MEAL_PLAN_LABELS: Record<string, string> = {
+  room_only:  'RO',
+  cp:         'CP',
+  map:        'MAP',
+  ap:         'AP',
+  ep:         'EP',
+};
+
+const MEAL_PLAN_COLORS: Record<string, string> = {
+  room_only: 'bg-gray-100 text-gray-600',
+  cp:        'bg-blue-50 text-blue-700',
+  map:       'bg-purple-50 text-purple-700',
+  ap:        'bg-green-50 text-green-700',
+  ep:        'bg-orange-50 text-orange-700',
+};
+
+const LOYALTY_COLORS: Record<string, string> = {
+  bronze:   'bg-amber-50  text-amber-700',
+  silver:   'bg-gray-100  text-gray-600',
+  gold:     'bg-yellow-50 text-yellow-700',
+  platinum: 'bg-indigo-50 text-indigo-700',
+};
+
+// ── Days-Staying helper ──────────────────────────────────────────────────────
+function getDaysStaying(r: any): { label: string; colorClass: string; icon: React.ReactNode } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const checkIn  = new Date(r.checkIn);
+  const checkOut = new Date(r.checkOut);
+  checkIn.setHours(0, 0, 0, 0);
+  checkOut.setHours(0, 0, 0, 0);
+
+  if (r.status === 'checked_out') {
+    return {
+      label: `${r.nights}N stayed`,
+      colorClass: 'bg-gray-100 text-gray-500',
+      icon: <CheckCircle className="w-3 h-3" />,
+    };
+  }
+
+  if (r.status === 'cancelled') {
+    return {
+      label: `${r.nights}N (cancelled)`,
+      colorClass: 'bg-red-50 text-red-400 line-through',
+      icon: <Moon className="w-3 h-3" />,
+    };
+  }
+
+  if (r.status === 'confirmed') {
+    const daysUntil = Math.round((checkIn.getTime() - today.getTime()) / 86_400_000);
+    return {
+      label: daysUntil === 0 ? 'Arrives today' : `Arrives in ${daysUntil}d`,
+      colorClass: 'bg-blue-50 text-blue-700',
+      icon: <Calendar className="w-3 h-3" />,
+    };
+  }
+
+  // checked_in
+  const daysIn   = Math.round((today.getTime() - checkIn.getTime()) / 86_400_000);
+  const daysLeft = Math.round((checkOut.getTime() - today.getTime()) / 86_400_000);
+
+  if (daysLeft < 0) {
+    return {
+      label: `Overstay +${Math.abs(daysLeft)}d`,
+      colorClass: 'bg-rose-50 text-rose-700 font-semibold',
+      icon: <AlertTriangle className="w-3 h-3" />,
+    };
+  }
+  if (daysLeft === 0) {
+    return {
+      label: `Day ${daysIn + 1} · CO Today`,
+      colorClass: 'bg-orange-50 text-orange-700 font-semibold',
+      icon: <LogOut className="w-3 h-3" />,
+    };
+  }
+  return {
+    label: `Day ${daysIn + 1} · ${daysLeft}d left`,
+    colorClass: daysLeft === 1 ? 'bg-orange-50 text-orange-700' : 'bg-sky-50 text-sky-700',
+    icon: <Clock className="w-3 h-3" />,
+  };
+}
 
 export default function ReservationsPage() {
   const router = useRouter();
@@ -36,7 +119,6 @@ export default function ReservationsPage() {
     placeholderData: p => p,
   });
 
-  // Quick-view queries for tabs
   const { data: arrivalsData } = useQuery({
     queryKey: ['arrivals-today'],
     queryFn: () => api.get('/api/reservations/arrivals-today').then(r => r.data.data),
@@ -82,7 +164,6 @@ export default function ReservationsPage() {
               <p className="mt-1 text-sm opacity-80">{data?.totalDocs || 0} total reservations</p>
             </div>
 
-            {/* Today's quick stats */}
             <div className="flex gap-3 flex-wrap">
               {[
                 { label: 'Arrivals',   count: arrivalsData?.length   || 0, icon: <LogIn  className="w-3.5 h-3.5" />, color: 'rgba(134,239,172,0.25)' },
@@ -114,7 +195,6 @@ export default function ReservationsPage() {
 
         {/* ── Quick-view Today tabs ─────────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Arrivals Today */}
           <QuickViewCard
             title="Arrivals Today"
             icon={<LogIn className="w-4 h-4 text-green-600" />}
@@ -137,8 +217,7 @@ export default function ReservationsPage() {
                   <p className="text-xs text-gray-400">Room {r.roomNumber}</p>
                 </div>
                 {!r.guestId?.idVerified && (
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                    style={{ background: '#fffbeb', color: '#d97706' }}>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700">
                     ID Pending
                   </span>
                 )}
@@ -147,7 +226,6 @@ export default function ReservationsPage() {
             )}
           />
 
-          {/* Departures Today */}
           <QuickViewCard
             title="Departures Today"
             icon={<LogOut className="w-4 h-4 text-orange-600" />}
@@ -160,7 +238,7 @@ export default function ReservationsPage() {
                 onClick={() => router.push(`/dashboard/reservations/${r._id}`)}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-orange-50/50 cursor-pointer transition-colors border-b border-gray-50 last:border-0">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#F97316,#F43F5E)' }}>
+                  style={{ background: 'linear-gradient(135deg,#c2410c,#9f1239)' }}>
                   {r.guestId?.firstName?.[0]}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -170,8 +248,7 @@ export default function ReservationsPage() {
                   <p className="text-xs text-gray-400">Room {r.roomNumber}</p>
                 </div>
                 {r.folioId?.balance > 0 && (
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                    style={{ background: '#fef2f2', color: '#dc2626' }}>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-50 text-red-600">
                     ₹{r.folioId.balance} due
                   </span>
                 )}
@@ -180,7 +257,6 @@ export default function ReservationsPage() {
             )}
           />
 
-          {/* In-House */}
           <QuickViewCard
             title="In-House Now"
             icon={<Home className="w-4 h-4 text-blue-600" />}
@@ -188,30 +264,36 @@ export default function ReservationsPage() {
             items={(inHouseData || []).slice(0, 5)}
             emptyText="No guests in-house"
             router={router}
-            renderItem={(r: any) => (
-              <div key={r._id}
-                onClick={() => router.push(`/dashboard/reservations/${r._id}`)}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50/50 cursor-pointer transition-colors border-b border-gray-50 last:border-0">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#3b82f6,#2563eb)' }}>
-                  {r.guestId?.firstName?.[0]}
+            renderItem={(r: any) => {
+              const stay = getDaysStaying(r);
+              return (
+                <div key={r._id}
+                  onClick={() => router.push(`/dashboard/reservations/${r._id}`)}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50/50 cursor-pointer transition-colors border-b border-gray-50 last:border-0">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg,#3b82f6,#2563eb)' }}>
+                    {r.guestId?.firstName?.[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {r.guestId?.firstName} {r.guestId?.lastName}
+                    </p>
+                    <p className="text-xs text-gray-400">Room {r.roomNumber}</p>
+                  </div>
+                  <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1', stay.colorClass)}>
+                    {stay.icon}{stay.label}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
-                    {r.guestId?.firstName} {r.guestId?.lastName}
-                  </p>
-                  <p className="text-xs text-gray-400">Room {r.roomNumber} · CO: {formatDate(r.checkOut)}</p>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
-              </div>
-            )}
+              );
+            }}
           />
         </div>
 
         {/* ── Main table card ──────────────────────────────────────────────── */}
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
 
-          {/* Filters + search bar */}
+          {/* Filters + search */}
           <div className="border-b border-gray-100 px-4 py-4 space-y-3" style={{ background: '#fafafa' }}>
             <div className="flex flex-wrap gap-2">
               {FILTERS.map(f => (
@@ -220,7 +302,7 @@ export default function ReservationsPage() {
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all"
                   style={
                     status === f.value
-                      ? { background: 'linear-gradient(135deg,#F97316,#F43F5E)', color: '#fff', boxShadow: '0 2px 8px rgba(249,115,22,0.3)' }
+                      ? { background: 'linear-gradient(135deg,#c2410c,#9f1239)', color: '#fff', boxShadow: '0 2px 8px rgba(194,65,12,0.3)' }
                       : { background: '#fff', border: '1px solid #e5e7eb', color: '#4b5563' }
                   }
                 >
@@ -245,15 +327,14 @@ export default function ReservationsPage() {
             <PageLoader />
           ) : !data?.docs?.length ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg,#fff7ed,#fff1f2)' }}>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-orange-50">
                 <Bed className="w-7 h-7 text-orange-400" />
               </div>
               <p className="text-sm font-semibold text-gray-700">No reservations found</p>
               <p className="text-xs text-gray-400">Try adjusting your search or filters</p>
               <Link href="/dashboard/reservations/new">
                 <button className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90"
-                  style={{ background: 'linear-gradient(135deg,#F97316,#F43F5E)' }}>
+                  style={{ background: 'linear-gradient(135deg,#c2410c,#9f1239)' }}>
                   <Plus className="w-3.5 h-3.5" /> New Reservation
                 </button>
               </Link>
@@ -263,52 +344,154 @@ export default function ReservationsPage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr style={{ background: '#fafafa' }}>
-                    {['Guest', 'Booking Ref', 'Room', 'Check-in', 'Check-out', 'Nights', 'Amount', 'Status'].map(h => (
+                    {[
+                      'Guest', 'Booking Ref', 'Room', 'Check-in', 'Check-out',
+                      'Nights', 'Days Staying', 'Meal Plan', 'Amount', 'Payment', 'Status',
+                    ].map(h => (
                       <th key={h}
-                        className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 border-b border-gray-100">
+                        className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 border-b border-gray-100 whitespace-nowrap">
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {data.docs.map((r: any) => (
-                    <tr key={r._id}
-                      onClick={() => router.push(`/dashboard/reservations/${r._id}`)}
-                      className="hover:bg-orange-50/30 cursor-pointer transition-colors group">
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                            style={{ background: 'linear-gradient(135deg,#F97316,#F43F5E)' }}>
-                            {r.guestId?.firstName?.[0]}
+                  {data.docs.map((r: any) => {
+                    const stay = getDaysStaying(r);
+                    const mealLabel = MEAL_PLAN_LABELS[r.mealPlan] || r.mealPlan?.toUpperCase() || '—';
+                    const mealColor = MEAL_PLAN_COLORS[r.mealPlan] || 'bg-gray-100 text-gray-500';
+                    const loyaltyTier = r.guestId?.loyalty?.tier || 'bronze';
+                    const loyaltyColor = LOYALTY_COLORS[loyaltyTier] || LOYALTY_COLORS.bronze;
+
+                    // Payment display
+                    const isPaid    = r.paymentStatus === 'paid';
+                    const isPartial = r.paymentStatus === 'partial';
+                    const balanceDue = r.balanceDue ?? r.folioId?.balance ?? 0;
+
+                    return (
+                      <tr key={r._id}
+                        onClick={() => router.push(`/dashboard/reservations/${r._id}`)}
+                        className="hover:bg-orange-50/30 cursor-pointer transition-colors group">
+
+                        {/* Guest */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                              style={{ background: 'linear-gradient(135deg,#c2410c,#9f1239)' }}>
+                              {r.guestId?.firstName?.[0]}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {r.guestId?.firstName} {r.guestId?.lastName}
+                                </p>
+                                {r.guestId?.isVip && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-700">VIP</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <p className="text-xs text-gray-400">{r.guestId?.phone}</p>
+                                <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium capitalize', loyaltyColor)}>
+                                  {loyaltyTier}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">
-                              {r.guestId?.firstName} {r.guestId?.lastName}
-                            </p>
-                            <p className="text-xs text-gray-400">{r.guestId?.phone}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="font-mono text-xs px-2 py-1 rounded-lg font-semibold"
-                          style={{ background: '#f1f5f9', color: '#475569' }}>
-                          {r.bookingRef}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-sm font-bold text-gray-800">{r.roomNumber}</td>
-                      <td className="px-4 py-3.5 text-sm text-gray-600">{formatDate(r.checkIn)}</td>
-                      <td className="px-4 py-3.5 text-sm text-gray-600">{formatDate(r.checkOut)}</td>
-                      <td className="px-4 py-3.5 text-sm text-gray-500">{r.nights}n</td>
-                      <td className="px-4 py-3.5 text-sm font-bold text-gray-900">{formatCurrency(r.totalAmount)}</td>
-                      <td className="px-4 py-3.5">
-                        <span className={cn('px-2.5 py-1 rounded-full text-xs font-semibold capitalize',
-                          RESERVATION_STATUS_COLORS[r.status] || 'bg-gray-100 text-gray-600')}>
-                          {r.status?.replace('_', ' ')}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+
+                        {/* Booking Ref */}
+                        <td className="px-4 py-3.5">
+                          <span className="font-mono text-xs px-2 py-1 rounded-lg font-semibold bg-slate-100 text-slate-500">
+                            {r.bookingRef}
+                          </span>
+                        </td>
+
+                        {/* Room */}
+                        <td className="px-4 py-3.5">
+                          <p className="text-sm font-bold text-gray-800">{r.roomNumber}</p>
+                          <p className="text-xs text-gray-400 capitalize">{r.roomId?.type} · {r.roomId?.view}</p>
+                        </td>
+
+                        {/* Check-in */}
+                        <td className="px-4 py-3.5 text-sm text-gray-600 whitespace-nowrap">
+                          {formatDate(r.checkIn)}
+                        </td>
+
+                        {/* Check-out */}
+                        <td className="px-4 py-3.5 text-sm text-gray-600 whitespace-nowrap">
+                          {formatDate(r.checkOut)}
+                        </td>
+
+                        {/* Nights */}
+                        <td className="px-4 py-3.5">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                            <Moon className="w-3 h-3" /> {r.nights}N
+                          </span>
+                        </td>
+
+                        {/* Days Staying ── NEW */}
+                        <td className="px-4 py-3.5">
+                          <span className={cn(
+                            'inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full whitespace-nowrap',
+                            stay.colorClass,
+                          )}>
+                            {stay.icon}
+                            {stay.label}
+                          </span>
+                        </td>
+
+                        {/* Meal Plan ── NEW */}
+                        <td className="px-4 py-3.5">
+                          <span className={cn('text-xs font-bold px-2 py-1 rounded font-mono', mealColor)}>
+                            {mealLabel}
+                          </span>
+                        </td>
+
+                        {/* Amount */}
+                        <td className="px-4 py-3.5">
+                          <p className="text-sm font-bold text-gray-900">{formatCurrency(r.totalAmount)}</p>
+                          {r.advancePaid > 0 && (
+                            <p className="text-xs text-gray-400">Adv: {formatCurrency(r.advancePaid)}</p>
+                          )}
+                        </td>
+
+                        {/* Payment ── NEW */}
+                        <td className="px-4 py-3.5">
+                          {isPaid ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-green-50 text-green-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                              Paid
+                            </span>
+                          ) : isPartial ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-sky-50 text-sky-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
+                              Partial
+                            </span>
+                          ) : balanceDue > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-red-50 text-red-600">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                              ₹{balanceDue.toLocaleString('en-IN')} due
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                              Pending
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-4 py-3.5 w-16 text-center">
+                          <span className={cn(
+                            'px-2 py-1 rounded-full text-xs font-semibold capitalize',
+                            RESERVATION_STATUS_COLORS[r.status] || 'bg-gray-100 text-gray-600',
+                          )}>
+                            {r.status?.replace('_', ' ')}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -356,8 +539,7 @@ function QuickViewCard({ title, icon, iconBg, items, emptyText, renderItem }: {
           {icon}
         </div>
         <p className="text-sm font-bold text-gray-900 flex-1">{title}</p>
-        <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-          style={{ background: 'linear-gradient(135deg,#fff7ed,#fff1f2)', color: '#ea580c' }}>
+        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600">
           {items.length}
         </span>
       </div>

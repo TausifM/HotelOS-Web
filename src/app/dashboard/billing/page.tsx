@@ -3,7 +3,6 @@
 import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   Card,
   CardHeader,
@@ -47,12 +46,16 @@ import {
   ArrowRightLeft,
   CalendarDays,
   Activity,
+  UserCircle2,
+  Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 interface Charge {
-  _id: string;
+  id: string;
   description: string;
   department: string;
   quantity: number;
@@ -61,24 +64,36 @@ interface Charge {
   taxPct: number;
   taxAmount: number;
   postedAt: string;
-  postedBy?: { name: string };
+  postedBy?: {
+    name?: string;
+    role?: string;
+  };
+  addedByType?: 'staff' | 'owner';
+  staffName?: string;
+  staffRole?: string;
+  approvalRequired?: boolean;
+  approvalNote?: string;
+  ownerApprovedBy?: {
+    name?: string;
+    role?: string;
+  };
   isVoid: boolean;
   voidReason?: string;
 }
 
 interface Payment {
-  _id: string;
+  id: string;
   amount: number;
   mode: string;
   reference?: string;
   paidAt: string;
-  receivedBy?: { name: string };
+  receivedBy?: { name?: string };
   isRefund: boolean;
   notes?: string;
 }
 
 interface Folio {
-  _id: string;
+  id: string;
   folioNumber: string;
   folioType?: string;
   settlementType?: string;
@@ -95,8 +110,20 @@ interface Folio {
   gstInvoiceDate?: string;
   charges: Charge[];
   payments: Payment[];
-  guestId?: { firstName: string; lastName: string; phone: string; email?: string };
-  reservationId?: { bookingRef: string; roomNumber: string; checkIn: string; checkOut: string; nights: number };
+  guestId?: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    email?: string;
+    address?: any;
+  };
+  reservationId?: {
+    bookingRef?: string;
+    roomNumber?: string;
+    checkIn?: string;
+    checkOut?: string;
+    nights?: number;
+  };
 }
 
 const DEPT_LABELS: Record<string, string> = {
@@ -160,27 +187,27 @@ function ActionCard({
 }) {
   const toneClass =
     tone === 'danger'
-      ? 'border-rose-200 bg-rose-50'
+      ? 'border-rose-200 bg-rose-50/80'
       : tone === 'success'
-        ? 'border-emerald-200 bg-emerald-50'
+        ? 'border-emerald-200 bg-emerald-50/80'
         : tone === 'warning'
-          ? 'border-amber-200 bg-amber-50'
-          : 'border-white/60 bg-white/80';
+          ? 'border-amber-200 bg-amber-50/80'
+          : 'border-white/60 bg-white/85';
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        'rounded-2xl border p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md',
+        'rounded-3xl border p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg',
         toneClass
       )}
       type="button"
     >
-      <div className="mb-3 inline-flex rounded-xl bg-gradient-to-br from-orange-500 to-pink-500 p-2 text-white shadow">
+      <div className="mb-3 inline-flex rounded-2xl bg-gradient-to-br from-orange-500 to-pink-500 p-2.5 text-white shadow">
         {icon}
       </div>
-      <p className="text-sm font-semibold text-slate-900">{title}</p>
-      <p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p>
+      <p className="text-base font-semibold text-slate-900">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-slate-500">{subtitle}</p>
     </button>
   );
 }
@@ -195,29 +222,35 @@ function FolioListPanel({
   const [search, setSearch] = useState('');
   const [listType, setListType] = useState<'open' | 'unsettled'>('open');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['folios-list', listType],
-    queryFn: () => api.get(`/api/folios/${listType}`).then((r) => r.data.data),
-  });
+ const { data, isLoading } = useQuery({
+  queryKey: ['folios-list', listType],
+  queryFn: () => api.get(`/api/folios/${listType}`).then((r) => r.data.data),
+});
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase().trim();
     const rows = data || [];
     if (!term) return rows;
+
     return rows.filter((f: any) => {
       const guest = `${f.guestId?.firstName || ''} ${f.guestId?.lastName || ''}`.toLowerCase();
       const room = String(f.reservationId?.roomNumber || '').toLowerCase();
       const ref = String(f.reservationId?.bookingRef || '').toLowerCase();
       const folioNo = String(f.folioNumber || '').toLowerCase();
-      return guest.includes(term) || room.includes(term) || ref.includes(term) || folioNo.includes(term);
+      return (
+        guest.includes(term) ||
+        room.includes(term) ||
+        ref.includes(term) ||
+        folioNo.includes(term)
+      );
     });
   }, [data, search]);
 
   return (
-    <Card className="overflow-hidden border-white/60 bg-white/80 shadow-xl backdrop-blur">
+    <Card className="overflow-hidden border-white/60 bg-white/85 shadow-xl backdrop-blur">
       <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50">
         <div className="flex items-center justify-between gap-3">
-          <SectionTitle title="Folio Queue" subtitle="Cashier-ready folio list" />
+          <SectionTitle title="Folio Queue" subtitle="Open and unsettled folios" />
           <Badge variant="info">{filtered?.length || 0}</Badge>
         </div>
       </CardHeader>
@@ -250,78 +283,117 @@ function FolioListPanel({
           placeholder="Search folio, guest, room..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="text-sm"
         />
-      </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-10">
-          <Spinner />
-        </div>
-      ) : !filtered?.length ? (
-        <EmptyState title="No folios found" description="Try another filter or search term." />
-      ) : (
-        <div className="divide-y divide-slate-100">
-          {filtered.map((f: any) => {
-            const guestName = `${f.guestId?.firstName || ''} ${f.guestId?.lastName || ''}`.trim();
-            const selected = selectedFolioId === f?._id;
+        {isLoading ? (
+          <div className="flex justify-center py-10">
+            <Spinner />
+          </div>
+        ) : !filtered?.length ? (
+          <EmptyState title="No folios found" description="Try another filter or search term." />
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {filtered.map((f: any) => {
+  const folioId = String(f?._id || f?.id || '');
+  const guestName =
+    `${f.guestId?.firstName || ''} ${f.guestId?.lastName || ''}`.trim() || 'Guest';
+  const selected = selectedFolioId === folioId;
 
-            return (
-              <Link href={`/dashboard/guests/${f?.guestId?._id}`}>
-                <button
-                  key={f._id}
-                  onClick={() => onSelect(f?._id)}
-                  className={cn(
-                    'w-full px-4 py-3 text-left transition hover:bg-orange-50/60',
-                    selected && 'bg-gradient-to-r from-orange-50 to-pink-50'
-                  )}
-                  type="button"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-pink-500 text-sm font-bold text-white shadow">
-                      {guestName?.[0] || 'F'}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-900">{guestName || f.folioNumber}</p>
-                      <p className="text-xs text-slate-500">
-                        Folio {f.folioNumber} Â· Room {f.reservationId?.roomNumber || 'â€”'} Â· {f.reservationId?.bookingRef || 'â€”'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={cn('text-sm font-bold', f.balance > 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                        {formatCurrency(f.balance || 0)}
-                      </p>
-                      <p className="text-[11px] text-slate-400">{f.isSettled ? 'settled' : 'due'}</p>
-                    </div>
-                  </div>
-                </button>
-
-              </Link>
-
-            );
-          })}
-        </div>
+  return (
+    <button
+      key={folioId}
+      onClick={() => {
+        console.log('selected folio:', folioId, f);
+        onSelect(folioId);
+      }}
+      className={cn(
+        'w-full px-4 py-4 text-left transition hover:bg-orange-50/60',
+        selected && 'bg-gradient-to-r from-orange-50 to-pink-50 ring-1 ring-orange-200'
       )}
+      type="button"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-pink-500 text-sm font-bold text-white shadow">
+          {guestName?.[0] || 'G'}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-slate-900">{guestName}</p>
+          <p className="text-xs text-slate-500">
+            Folio {f.folioNumber} · Room {f.reservationId?.roomNumber || '-'} ·{' '}
+            {f.reservationId?.bookingRef || '-'}
+          </p>
+        </div>
+
+        <div className="text-right">
+          <p
+            className={cn(
+              'text-sm font-bold',
+              f.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
+            )}
+          >
+            {formatCurrency(f.balance || 0)}
+          </p>
+          <p className="text-[11px] text-slate-400">
+            {f.isSettled ? 'Settled' : 'Due'}
+          </p>
+        </div>
+      </div>
+    </button>
+  );
+})}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
 
 function ReconciliationPanel() {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['folio-reconciliation', date],
+    queryKey: ['folio-reconciliation', startDate, endDate],
     queryFn: () =>
-      api.get('/api/folios/reconciliation/daily', { params: { date } }).then((r) => r.data.data),
+      api
+        .get('/api/folios/reconciliation/daily', {
+          params: { startDate, endDate },
+        })
+        .then((r) => r.data.data),
   });
 
   return (
-    <Card className="border-white/60 bg-white/80 shadow-xl backdrop-blur">
+    <Card className="border-white/60 bg-white/85 shadow-xl backdrop-blur">
       <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50">
-        <div className="flex items-center justify-between gap-3">
-          <SectionTitle title="Daily Reconciliation" subtitle="Finance and cashier summary" />
-          <div className="w-44">
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SectionTitle
+            title="Daily Reconciliation"
+            subtitle="Finance and cashier summary"
+          />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-44">
+              <Input
+                label="From"
+                type="date"
+                value={startDate}
+                max={endDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+
+            <div className="w-44">
+              <Input
+                label="To"
+                type="date"
+                value={endDate}
+                min={startDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -338,15 +410,23 @@ function ReconciliationPanel() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-xs text-slate-500">Total Charges</p>
-                <p className="mt-1 text-xl font-bold text-slate-900">{formatCurrency(data.totals?.totalCharges || 0)}</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">
+                  {formatCurrency(data.totals?.totalCharges || 0)}
+                </p>
               </div>
+
               <div className="rounded-2xl bg-emerald-50 p-4">
                 <p className="text-xs text-emerald-600">Total Payments</p>
-                <p className="mt-1 text-xl font-bold text-emerald-700">{formatCurrency(data.totals?.totalPayments || 0)}</p>
+                <p className="mt-1 text-xl font-bold text-emerald-700">
+                  {formatCurrency(data.totals?.totalPayments || 0)}
+                </p>
               </div>
+
               <div className="rounded-2xl bg-rose-50 p-4">
                 <p className="text-xs text-rose-600">Outstanding</p>
-                <p className="mt-1 text-xl font-bold text-rose-700">{formatCurrency(data.totals?.totalBalance || 0)}</p>
+                <p className="mt-1 text-xl font-bold text-rose-700">
+                  {formatCurrency(data.totals?.totalBalance || 0)}
+                </p>
               </div>
             </div>
 
@@ -362,19 +442,35 @@ function ReconciliationPanel() {
                     <Th>Status</Th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  {data.rows?.map((row: any) => (
-                    <Tr key={row.folioId}>
-                      <Td className="font-mono text-xs">{row.folioNumber}</Td>
-                      <Td className="text-sm">{row.guestName || 'â€”'}</Td>
-                      <Td>{formatCurrency(row.totalCharges)}</Td>
-                      <Td>{formatCurrency(row.totalPayments)}</Td>
-                      <Td className={cn('font-semibold', row.balance > 0 ? 'text-rose-600' : 'text-emerald-600')}>
-                        {formatCurrency(row.balance)}
-                      </Td>
-                      <Td>{row.settled ? <Badge variant="success">Settled</Badge> : <Badge variant="danger">Open</Badge>}</Td>
-                    </Tr>
-                  ))}
+                  {data.rows?.map((row: any, index: number) => {
+                    const rowKey = String(row?.folioId || row?.folioNumber || `recon-${index}`);
+
+                    return (
+                      <Tr key={rowKey}>
+                        <Td className="font-mono text-xs">{row.folioNumber}</Td>
+                        <Td className="text-sm">{row.guestName}</Td>
+                        <Td>{formatCurrency(row.totalCharges)}</Td>
+                        <Td>{formatCurrency(row.totalPayments)}</Td>
+                        <Td
+                          className={cn(
+                            'font-semibold',
+                            row.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
+                          )}
+                        >
+                          {formatCurrency(row.balance)}
+                        </Td>
+                        <Td>
+                          {row.settled ? (
+                            <Badge variant="success">Settled</Badge>
+                          ) : (
+                            <Badge variant="danger">Open</Badge>
+                          )}
+                        </Td>
+                      </Tr>
+                    );
+                  })}
                 </tbody>
               </Table>
             </div>
@@ -387,9 +483,18 @@ function ReconciliationPanel() {
 
 function FolioDetailPanel({ folioId }: { folioId: string }) {
   const qc = useQueryClient();
+  const { user, hasRole, isHydrated } = useAuth();
+
+  const currentUserName = user?.name || user?.email || 'Current User';
+  const currentUserRole = user?.role || 'Staff';
+
+  const isOwnerUser =
+    hasRole('owner', 'superadmin') ||
+    ['owner', 'admin', 'super_admin', 'superadmin'].includes(
+      String(currentUserRole).toLowerCase()
+    );
 
   const [activeTab, setActiveTab] = useState<'overview' | 'charges' | 'payments' | 'timeline' | 'invoice'>('overview');
-
   const [showChargeModal, setShowChargeModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -407,6 +512,11 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
     amount: '',
     quantity: '1',
     taxPct: '5',
+    addedByType: 'staff' as 'staff' | 'owner',
+    staffName: '',
+    staffRole: '',
+    approvalRequired: false,
+    approvalNote: '',
   });
 
   const [payForm, setPayForm] = useState({
@@ -445,31 +555,48 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
     email: '',
   });
 
+  function openChargeModal(mode: 'staff' | 'owner' = isOwnerUser ? 'owner' : 'staff') {
+    setChargeForm({
+      description: '',
+      department: 'fb',
+      amount: '',
+      quantity: '1',
+      taxPct: '5',
+      addedByType: mode,
+      staffName: currentUserName,
+      staffRole: currentUserRole,
+      approvalRequired: false,
+      approvalNote: '',
+    });
+    setShowChargeModal(true);
+  }
+
   const { data: folio, isLoading } = useQuery<Folio>({
     queryKey: ['folio', folioId],
     queryFn: () => api.get(`/api/folios/${folioId}`).then((r) => r.data.data),
     refetchInterval: 15000,
+    enabled: !!folioId && isHydrated,
   });
 
   const { data: summary } = useQuery({
     queryKey: ['folio-summary', folioId],
     queryFn: () => api.get(`/api/folios/${folioId}/summary`).then((r) => r.data.data),
-    enabled: !!folioId,
+    enabled: !!folioId && isHydrated,
   });
 
   const { data: timeline } = useQuery({
     queryKey: ['folio-timeline', folioId],
     queryFn: () => api.get(`/api/folios/${folioId}/timeline`).then((r) => r.data.data),
-    enabled: !!folioId && activeTab === 'timeline',
+    enabled: !!folioId && activeTab === 'timeline' && isHydrated,
   });
 
   const { data: invoicePreview } = useQuery({
     queryKey: ['folio-invoice-preview', folioId],
     queryFn: () => api.get(`/api/folios/${folioId}/invoice-preview`).then((r) => r.data.data),
-    enabled: !!folioId && activeTab === 'invoice',
+    enabled: !!folioId && activeTab === 'invoice' && isHydrated,
   });
 
-  const { data: checkoutValidation, refetch: refetchCheckoutValidation, isFetching: checkoutChecking } = useQuery({
+  const { data: checkoutValidation, refetch: refetchCheckoutValidation } = useQuery({
     queryKey: ['folio-checkout-validate', folioId],
     queryFn: () => api.post(`/api/folios/${folioId}/checkout-validate`).then((r) => r.data.data),
     enabled: false,
@@ -490,7 +617,18 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
       toast.success('Charge posted');
       invalidateAll();
       setShowChargeModal(false);
-      setChargeForm({ description: '', department: 'fb', amount: '', quantity: '1', taxPct: '5' });
+      setChargeForm({
+        description: '',
+        department: 'fb',
+        amount: '',
+        quantity: '1',
+        taxPct: '5',
+        addedByType: isOwnerUser ? 'owner' : 'staff',
+        staffName: currentUserName,
+        staffRole: currentUserRole,
+        approvalRequired: false,
+        approvalNote: '',
+      });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
@@ -549,25 +687,7 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
-  function formatAddress(address: any) {
-    if (!address) return '—';
-    if (typeof address === 'string') return address;
 
-    if (typeof address === 'object') {
-      return [
-        address.line1,
-        address.line2,
-        address.city,
-        address.state,
-        address.postalCode || address.pincode,
-        address.country,
-      ]
-        .filter(Boolean)
-        .join(', ');
-    }
-
-    return '—';
-  }
   const closeFolio = useMutation({
     mutationFn: () => api.post(`/api/folios/${folioId}/close`),
     onSuccess: () => {
@@ -596,6 +716,24 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
+  function formatAddress(address: any) {
+    if (!address) return '';
+    if (typeof address === 'string') return address;
+    if (typeof address === 'object') {
+      return [
+        address.line1,
+        address.line2,
+        address.city,
+        address.state,
+        address.postalCode || address.pincode,
+        address.country,
+      ]
+        .filter(Boolean)
+        .join(', ');
+    }
+    return '';
+  }
+
   async function generateInvoice() {
     setInvoiceLoading(true);
     try {
@@ -617,8 +755,8 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
 
   async function loadQR() {
     try {
-      const { data } = await api.get(`/api/payments/upi-qr/${folioId}`);
-      setQrData(data.data);
+      const data = await api.get(`/api/payments/upi-qr/${folioId}`);
+      setQrData(data.data.data || data.data);
       setShowQR(true);
     } catch {
       toast.error('QR generation failed');
@@ -660,6 +798,14 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
     else toast.error('Checkout validation found issues');
   }
 
+  if (!isHydrated) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -685,8 +831,8 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-[28px] border border-white/60 bg-white/80 shadow-xl backdrop-blur">
-        <div className="bg-[radial-gradient(circle_at_top_left,_rgba(251,146,60,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(236,72,153,0.18),_transparent_28%),linear-gradient(135deg,_#fff7ed,_#fff1f2_45%,_#ffffff)] p-5">
+      <div className="overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-xl backdrop-blur">
+        <div className="bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.18),transparent_30%),radial-gradient(circle_at_top_right,rgba(236,72,153,0.18),transparent_28%),linear-gradient(135deg,#fff7ed,#fff1f2_45%,#ffffff)] p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="mb-2 flex items-center gap-3">
@@ -696,7 +842,7 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                 <div>
                   <h2 className="font-mono text-xl font-bold text-slate-900">{folio.folioNumber}</h2>
                   <p className="text-sm text-slate-500">
-                    {guest?.firstName} {guest?.lastName} Â· Room {resv?.roomNumber || 'â€”'} Â· {resv?.bookingRef || 'â€”'}
+                    {guest?.firstName} {guest?.lastName} · Room {resv?.roomNumber} · {resv?.bookingRef}
                   </p>
                 </div>
               </div>
@@ -715,6 +861,8 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                 )}
                 {folio.gstInvoiceNo ? <Badge variant="info">GST Invoice {folio.gstInvoiceNo}</Badge> : null}
                 {summary?.settlementType ? <Badge variant="default">{summary.settlementType}</Badge> : null}
+                <Badge variant="default">{currentUserName}</Badge>
+                <Badge variant="info">{currentUserRole}</Badge>
               </div>
             </div>
 
@@ -756,7 +904,9 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
           <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <div className="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-white/60">
               <p className="text-xs text-slate-500">Taxable Amount</p>
-              <p className="mt-1 text-xl font-bold text-slate-900">{formatCurrency(folio.totalCharges - folio.totalTax)}</p>
+              <p className="mt-1 text-xl font-bold text-slate-900">
+                {formatCurrency(folio.totalCharges - folio.totalTax)}
+              </p>
             </div>
             <div className="rounded-2xl bg-amber-50 p-4 shadow-sm ring-1 ring-amber-100">
               <p className="text-xs text-amber-700">GST</p>
@@ -771,59 +921,124 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
               <p className="mt-1 text-xl font-bold text-rose-700">{formatCurrency(folio.balance)}</p>
             </div>
           </div>
+
+          {checkoutValidation ? (
+            <div
+              className={cn(
+                'mt-4 rounded-2xl border p-4 text-sm',
+                checkoutValidation.valid
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-800'
+              )}
+            >
+              <div className="mb-1 flex items-center gap-2 font-semibold">
+                {checkoutValidation.valid ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                Checkout Validation
+              </div>
+              {checkoutValidation.valid ? (
+                <p>No blocking issues found.</p>
+              ) : (
+                <ul className="list-disc space-y-1 pl-5">
+                  {checkoutValidation.issues?.map((issue: string) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
-
-      {checkoutValidation ? (
-        <div
-          className={cn(
-            'rounded-2xl border p-4 text-sm',
-            checkoutValidation.valid ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'
-          )}
-        >
-          <div className="mb-1 flex items-center gap-2 font-semibold">
-            {checkoutValidation.valid ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-            Checkout Validation
-          </div>
-          {checkoutValidation.valid ? (
-            <p>No blocking issues found.</p>
-          ) : (
-            <ul className="list-disc space-y-1 pl-5">
-              {checkoutValidation.issues?.map((issue: string) => (
-                <li key={issue}>{issue}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {!folio.isSettled && !roomChargePosted ? (
-          <ActionCard icon={<BedDouble className="h-4 w-4" />} title="Post Room Charges" subtitle="Add room revenue and GST" onClick={postRoomCharges} />
+          <ActionCard
+            icon={<BedDouble className="h-4 w-4" />}
+            title="Post Room Charges"
+            subtitle="Add room revenue and GST"
+            onClick={postRoomCharges}
+          />
         ) : null}
+
         {!folio.isSettled ? (
-          <>
-            <ActionCard icon={<Utensils className="h-4 w-4" />} title="Add Food Charges" subtitle="Import delivered restaurant items" onClick={postRestaurantCharges} />
-            <ActionCard icon={<Plus className="h-4 w-4" />} title="Post Charge" subtitle="Manual laundry, transport, misc and more" onClick={() => setShowChargeModal(true)} />
-            <ActionCard
-              icon={<CreditCard className="h-4 w-4" />}
-              title="Record Payment"
-              subtitle="Cash, card, UPI and direct billing"
-              onClick={() => {
-                setPayForm((p) => ({ ...p, amount: String(folio.balance) }));
-                setShowPayModal(true);
-              }}
-              tone="success"
-            />
-            <ActionCard icon={<Percent className="h-4 w-4" />} title="Discount" subtitle="Apply approved discount or waiver" onClick={() => setShowDiscountModal(true)} />
-            <ActionCard icon={<RotateCcw className="h-4 w-4" />} title="Refund" subtitle="Record refund against folio payment" onClick={() => setShowRefundModal(true)} tone="danger" />
-            <ActionCard icon={<ArrowRightLeft className="h-4 w-4" />} title="Advance Adjust" subtitle="Adjust deposit or advance payment" onClick={() => setShowAdvanceModal(true)} />
-            <ActionCard icon={<Scale className="h-4 w-4" />} title="Settle Folio" subtitle="Auto-settle remaining balance" onClick={() => setShowSettleModal(true)} tone="warning" />
-          </>
+          <ActionCard
+            icon={<Utensils className="h-4 w-4" />}
+            title="Add Food Charges"
+            subtitle="Import delivered restaurant items"
+            onClick={postRestaurantCharges}
+          />
+        ) : null}
+
+        {!folio.isSettled ? (
+          <ActionCard
+            icon={<Plus className="h-4 w-4" />}
+            title="Post Charge"
+            subtitle={`Quick manual charge as ${currentUserRole}`}
+            onClick={() => openChargeModal(isOwnerUser ? 'owner' : 'staff')}
+          />
+        ) : null}
+
+        {!folio.isSettled ? (
+          <ActionCard
+            icon={<ShieldCheck className="h-4 w-4" />}
+            title="Staff Charge Entry"
+            subtitle="Track staff name, role and approval flow"
+            onClick={() => openChargeModal('staff')}
+          />
+        ) : null}
+
+        {!folio.isSettled ? (
+          <ActionCard
+            icon={<CreditCard className="h-4 w-4" />}
+            title="Record Payment"
+            subtitle="Cash, card, UPI and direct billing"
+            onClick={() => {
+              setPayForm((p) => ({ ...p, amount: String(folio.balance) }));
+              setShowPayModal(true);
+            }}
+            tone="success"
+          />
+        ) : null}
+
+        {!folio.isSettled ? (
+          <ActionCard
+            icon={<Percent className="h-4 w-4" />}
+            title="Discount"
+            subtitle="Apply approved discount or waiver"
+            onClick={() => setShowDiscountModal(true)}
+          />
+        ) : null}
+
+        {!folio.isSettled ? (
+          <ActionCard
+            icon={<RotateCcw className="h-4 w-4" />}
+            title="Refund"
+            subtitle="Record refund against folio payment"
+            onClick={() => setShowRefundModal(true)}
+            tone="danger"
+          />
+        ) : null}
+
+        {!folio.isSettled ? (
+          <ActionCard
+            icon={<ArrowRightLeft className="h-4 w-4" />}
+            title="Advance Adjust"
+            subtitle="Adjust deposit or advance payment"
+            onClick={() => setShowAdvanceModal(true)}
+          />
+        ) : null}
+
+        {!folio.isSettled ? (
+          <ActionCard
+            icon={<Scale className="h-4 w-4" />}
+            title="Settle Folio"
+            subtitle="Auto-settle remaining balance"
+            onClick={() => setShowSettleModal(true)}
+            tone="warning"
+          />
         ) : null}
       </div>
 
-      <Card className="border-white/60 bg-white/80 shadow-xl backdrop-blur">
+      <Card className="border-white/60 bg-white/85 shadow-xl backdrop-blur">
         <div className="border-b border-slate-100 px-4 pt-4">
           <div className="flex flex-wrap gap-2">
             {tabs.map((tab) => (
@@ -845,45 +1060,53 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
         </div>
 
         <CardContent className="pt-4">
-          {activeTab === 'overview' && (
+          {activeTab === 'overview' ? (
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <SectionTitle title="Guest & Stay" />
-                <div className="mt-3 space-y-2 text-sm text-slate-600">
+              <div className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
+                <SectionTitle title="Guest & Stay" subtitle="Current reservation and guest details" />
+                <div className="mt-4 space-y-2 text-sm text-slate-600">
                   <p><span className="font-semibold text-slate-900">Guest:</span> {guest?.firstName} {guest?.lastName}</p>
-                  <p><span className="font-semibold text-slate-900">Phone:</span> {guest?.phone || 'â€”'}</p>
-                  <p><span className="font-semibold text-slate-900">Email:</span> {guest?.email || 'â€”'}</p>
-                  <p><span className="font-semibold text-slate-900">Booking Ref:</span> {resv?.bookingRef || 'â€”'}</p>
-                  <p><span className="font-semibold text-slate-900">Room:</span> {resv?.roomNumber || 'â€”'}</p>
-                  <p><span className="font-semibold text-slate-900">Stay:</span> {resv?.checkIn ? formatDate(resv.checkIn) : 'â€”'} to {resv?.checkOut ? formatDate(resv.checkOut) : 'â€”'}</p>
+                  <p><span className="font-semibold text-slate-900">Phone:</span> {guest?.phone || '-'}</p>
+                  <p><span className="font-semibold text-slate-900">Email:</span> {guest?.email || '-'}</p>
+                  <p><span className="font-semibold text-slate-900">Booking Ref:</span> {resv?.bookingRef || '-'}</p>
+                  <p><span className="font-semibold text-slate-900">Room:</span> {resv?.roomNumber || '-'}</p>
+                  <p>
+                    <span className="font-semibold text-slate-900">Stay:</span>{' '}
+                    {resv?.checkIn ? formatDate(resv.checkIn) : '-'} to{' '}
+                    {resv?.checkOut ? formatDate(resv.checkOut) : '-'}
+                  </p>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <SectionTitle title="Folio Snapshot" />
-                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-xl bg-white p-3">
+              <div className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
+                <SectionTitle title="Folio Snapshot" subtitle="Financial and invoice summary" />
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-2xl bg-white p-4">
                     <p className="text-xs text-slate-500">Charges</p>
                     <p className="mt-1 font-bold text-slate-900">{activeCharges.length}</p>
                   </div>
-                  <div className="rounded-xl bg-white p-3">
+                  <div className="rounded-2xl bg-white p-4">
                     <p className="text-xs text-slate-500">Payments</p>
                     <p className="mt-1 font-bold text-slate-900">{folio.payments?.length || 0}</p>
                   </div>
-                  <div className="rounded-xl bg-white p-3">
+                  <div className="rounded-2xl bg-white p-4">
                     <p className="text-xs text-slate-500">Invoice No</p>
-                    <p className="mt-1 font-mono text-xs font-bold text-slate-900">{folio.gstInvoiceNo || 'Not generated'}</p>
+                    <p className="mt-1 font-mono text-xs font-bold text-slate-900">
+                      {folio.gstInvoiceNo || 'Not generated'}
+                    </p>
                   </div>
-                  <div className="rounded-xl bg-white p-3">
+                  <div className="rounded-2xl bg-white p-4">
                     <p className="text-xs text-slate-500">Settled At</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-900">{folio.settledAt ? formatDateTime(folio.settledAt) : 'Not settled'}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-900">
+                      {folio.settledAt ? formatDateTime(folio.settledAt) : 'Not settled'}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
 
-          {activeTab === 'charges' && (
+          {activeTab === 'charges' ? (
             !folio.charges?.length ? (
               <EmptyState title="No charges yet" description="Post room, food, spa or misc charges." />
             ) : (
@@ -901,29 +1124,81 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {folio.charges.map((c) => (
-                    <Tr key={c._id} className={c.isVoid ? 'opacity-40 line-through' : ''}>
-                      <Td className="font-medium text-sm">{c.description}</Td>
+                  {folio.charges.map((c:any, i:number) => (
+                    <Tr key={i} className={c.isVoid ? 'opacity-40 line-through' : ''}>
+                      <Td className="font-medium text-sm">
+                        <div>{c.description}</div>
+                        {c.approvalNote ? (
+                          <div className="mt-1 text-xs text-slate-500">{c.approvalNote}</div>
+                        ) : null}
+                      </Td>
+
                       <Td>
-                        <span className={cn('rounded-full px-2 py-1 text-[10px] font-semibold', DEPT_COLORS[c.department] || 'bg-slate-100 text-slate-600')}>
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-1 text-[10px] font-semibold',
+                            DEPT_COLORS[c.department] || 'bg-slate-100 text-slate-600'
+                          )}
+                        >
                           {DEPT_LABELS[c.department] || c.department}
                         </span>
                       </Td>
+
                       <Td className="text-sm">{c.quantity}</Td>
                       <Td className="text-sm">{formatCurrency(c.unitPrice)}</Td>
                       <Td className="text-sm text-amber-700">
-                        {c.taxPct}% ({formatCurrency(c.taxAmount)})
+                        {c.taxPct}% · {formatCurrency(c.taxAmount)}
                       </Td>
                       <Td className="font-semibold text-sm">{formatCurrency(c.amount + c.taxAmount)}</Td>
+
                       <Td className="text-xs text-slate-400">
-                        {formatDate(c.postedAt, 'dd MMM, h:mm a')}
-                        {c.postedBy && <span className="block">{c.postedBy.name}</span>}
+                        <span className="block">{formatDate(c.postedAt, 'dd MMM, h:mm a')}</span>
+
+                        {c.postedBy?.name ? (
+                          <span className="mt-1 block font-medium text-slate-700">{c.postedBy.name}</span>
+                        ) : c.staffName ? (
+                          <span className="mt-1 block font-medium text-slate-700">{c.staffName}</span>
+                        ) : null}
+
+                        {(c.staffRole || c.postedBy?.role) ? (
+                          <span className="block text-[11px] text-slate-500">
+                            {c.staffRole || c.postedBy?.role}
+                          </span>
+                        ) : null}
+
+                        {c.addedByType ? (
+                          <span
+                            className={cn(
+                              'mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                              c.addedByType === 'owner'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-sky-100 text-sky-700'
+                            )}
+                          >
+                            {c.addedByType === 'owner' ? 'Owner Added' : 'Staff Added'}
+                          </span>
+                        ) : null}
+
+                        {c.approvalRequired ? (
+                          <span className="mt-1 block text-[11px] font-medium text-amber-600">
+                            Approval marked
+                          </span>
+                        ) : null}
+
+                        {c.ownerApprovedBy?.name ? (
+                          <span className="block text-[11px] text-emerald-600">
+                            Approved by {c.ownerApprovedBy.name}
+                          </span>
+                        ) : null}
                       </Td>
+
                       <Td>
                         {!c.isVoid && !folio.isSettled ? (
                           <button
                             onClick={() => {
-                              if (confirm('Void this charge?')) voidCharge.mutate({ chargeId: c._id, reason: 'Voided by staff' });
+                              if (confirm('Void this charge?')) {
+                                voidCharge.mutate({ chargeId: c.id, reason: 'Voided by staff' });
+                              }
                             }}
                             className="text-rose-500 transition hover:text-rose-700"
                             title="Void charge"
@@ -940,9 +1215,9 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                 </tbody>
               </Table>
             )
-          )}
+          ) : null}
 
-          {activeTab === 'payments' && (
+          {activeTab === 'payments' ? (
             !folio.payments?.length ? (
               <EmptyState title="No payments yet" />
             ) : (
@@ -958,28 +1233,32 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                 </thead>
                 <tbody>
                   {folio.payments.map((p) => (
-                    <Tr key={p._id}>
+                    <Tr key={p.id}>
                       <Td>
                         <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
                           {PAYMENT_MODE_LABELS[p.mode] || p.mode}
                         </span>
-                        {p.isRefund ? <span className="ml-2 rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">Refund</span> : null}
+                        {p.isRefund ? (
+                          <span className="ml-2 rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">
+                            Refund
+                          </span>
+                        ) : null}
                       </Td>
                       <Td className={cn('font-bold text-sm', p.isRefund ? 'text-rose-700' : 'text-emerald-700')}>
-                        {p.isRefund ? '-' : '+'}
+                        {p.isRefund ? '-' : ''}
                         {formatCurrency(p.amount)}
                       </Td>
-                      <Td className="font-mono text-xs text-slate-500">{p.reference || 'â€”'}</Td>
+                      <Td className="font-mono text-xs text-slate-500">{p.reference}</Td>
                       <Td className="text-xs text-slate-400">{formatDateTime(p.paidAt)}</Td>
-                      <Td className="text-xs text-slate-500">{(p.receivedBy as any)?.name || 'â€”'}</Td>
+                      <Td className="text-xs text-slate-500">{(p.receivedBy as any)?.name}</Td>
                     </Tr>
                   ))}
                 </tbody>
               </Table>
             )
-          )}
+          ) : null}
 
-          {activeTab === 'timeline' && (
+          {activeTab === 'timeline' ? (
             !timeline?.length ? (
               <EmptyState title="No timeline events" />
             ) : (
@@ -990,9 +1269,15 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                       <Activity className="h-4 w-4" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold capitalize text-slate-900">{String(item.type).replace(/_/g, ' ')}</p>
-                      <p className="mt-1 text-sm text-slate-600">{item.description || item.notes || item.reference || item.invoiceNo || 'Folio event'}</p>
-                      <p className="mt-1 text-xs text-slate-400">{item.at ? formatDateTime(item.at) : 'â€”'}</p>
+                      <p className="text-sm font-semibold capitalize text-slate-900">
+                        {String(item.type).replace(/_/g, ' ')}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {item.description || item.notes || item.reference || item.invoiceNo || 'Folio event'}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {item.at ? formatDateTime(item.at) : ''}
+                      </p>
                     </div>
                     <div className="text-right text-sm font-bold text-slate-900">
                       {typeof item.amount === 'number' ? formatCurrency(item.amount) : ''}
@@ -1001,11 +1286,13 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                 ))}
               </div>
             )
-          )}
+          ) : null}
 
-          {activeTab === 'invoice' && (
+          {activeTab === 'invoice' ? (
             !invoicePreview ? (
-              <div className="flex justify-center py-10"><Spinner /></div>
+              <div className="flex justify-center py-10">
+                <Spinner />
+              </div>
             ) : (
               <div className="space-y-4">
                 <div className="grid gap-4 lg:grid-cols-2">
@@ -1014,17 +1301,18 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                     <div className="mt-3 space-y-1 text-sm text-slate-600">
                       <p className="font-semibold text-slate-900">{invoicePreview.hotel?.name}</p>
                       <p>{invoicePreview.hotel?.address}</p>
-                      <p>GSTIN: {invoicePreview.hotel?.gstin || 'â€”'}</p>
-                      <p>{invoicePreview.hotel?.phone} Â· {invoicePreview.hotel?.email}</p>
+                      <p>GSTIN {invoicePreview.hotel?.gstin}</p>
+                      <p>{invoicePreview.hotel?.phone} {invoicePreview.hotel?.email}</p>
                     </div>
                   </div>
+
                   <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                     <SectionTitle title="Invoice To" />
                     <div className="mt-3 space-y-1 text-sm text-slate-600">
                       <p className="font-semibold text-slate-900">{invoicePreview.guest?.name}</p>
                       <p>{formatAddress(invoicePreview.guest?.address)}</p>
-                      <p>Phone: {invoicePreview.guest?.phone || 'â€”'}</p>
-                      <p>GSTIN: {invoicePreview.guest?.gstin || 'â€”'}</p>
+                      <p>Phone {invoicePreview.guest?.phone}</p>
+                      <p>GSTIN {invoicePreview.guest?.gstin}</p>
                     </div>
                   </div>
                 </div>
@@ -1047,7 +1335,7 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                           <Td>{c.description}</Td>
                           <Td>{c.quantity}</Td>
                           <Td>{formatCurrency(c.unitPrice)}</Td>
-                          <Td>{c.taxPct}%</Td>
+                          <Td>{c.taxPct}</Td>
                           <Td>{formatCurrency(c.taxAmount)}</Td>
                           <Td>{formatCurrency(c.amount + c.taxAmount)}</Td>
                         </Tr>
@@ -1080,7 +1368,7 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                 </div>
               </div>
             )
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -1089,23 +1377,65 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
+
+            if (!chargeForm.description.trim()) {
+              toast.error('Description is required');
+              return;
+            }
+
+            if (!chargeForm.amount || Number(chargeForm.amount) <= 0) {
+              toast.error('Enter valid unit price');
+              return;
+            }
+
+            if (!chargeForm.quantity || Number(chargeForm.quantity) <= 0) {
+              toast.error('Enter valid quantity');
+              return;
+            }
+
             postCharge.mutate({
               description: chargeForm.description,
               department: chargeForm.department,
               amount: parseFloat(chargeForm.amount),
               quantity: parseFloat(chargeForm.quantity),
-              taxPct: parseFloat(chargeForm.taxPct),
+              taxPct: parseFloat(chargeForm.taxPct || '0'),
+              addedByType: chargeForm.addedByType,
+              staffName: chargeForm.staffName,
+              staffRole: chargeForm.staffRole,
+              approvalRequired: chargeForm.approvalRequired,
+              approvalNote: chargeForm.approvalNote || undefined,
             });
           }}
         >
+          <div className="rounded-3xl border border-orange-100 bg-gradient-to-r from-orange-50 via-white to-pink-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-gradient-to-br from-orange-500 to-pink-500 p-2 text-white shadow">
+                <UserCircle2 className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Posting user</p>
+                <p className="text-sm font-bold text-slate-900">{chargeForm.staffName || currentUserName}</p>
+                <p className="text-xs text-slate-500">{chargeForm.staffRole || currentUserRole}</p>
+              </div>
+              <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                {chargeForm.addedByType === 'owner' ? 'Owner Entry' : 'Staff Entry'}
+              </div>
+            </div>
+          </div>
+
           <Input
             label="Description"
             value={chargeForm.description}
             onChange={(e) => setChargeForm((p) => ({ ...p, description: e.target.value }))}
             required
           />
-          <div className="grid grid-cols-2 gap-4">
-            <Select label="Department" value={chargeForm.department} onChange={(e) => setChargeForm((p) => ({ ...p, department: e.target.value }))}>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Select
+              label="Department"
+              value={chargeForm.department}
+              onChange={(e) => setChargeForm((p) => ({ ...p, department: e.target.value }))}
+            >
               {Object.entries(DEPT_LABELS)
                 .filter(([k]) => !['tax'].includes(k))
                 .map(([v, l]) => (
@@ -1114,6 +1444,7 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                   </option>
                 ))}
             </Select>
+
             <Input
               label="Tax %"
               type="number"
@@ -1122,8 +1453,9 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
               value={chargeForm.taxPct}
               onChange={(e) => setChargeForm((p) => ({ ...p, taxPct: e.target.value }))}
             />
+
             <Input
-              label="Unit Price (â‚¹)"
+              label="Unit Price (₹)"
               type="number"
               min="0"
               step="0.01"
@@ -1131,17 +1463,80 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
               onChange={(e) => setChargeForm((p) => ({ ...p, amount: e.target.value }))}
               required
             />
+
             <Input
               label="Quantity"
               type="number"
               min="1"
+              step="1"
               value={chargeForm.quantity}
               onChange={(e) => setChargeForm((p) => ({ ...p, quantity: e.target.value }))}
             />
           </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input label="Added By" value={chargeForm.staffName} disabled />
+            <Input label="Role" value={chargeForm.staffRole} disabled />
+
+            <Select
+              label="Entry Type"
+              value={chargeForm.addedByType}
+              onChange={(e) =>
+                setChargeForm((p) => ({
+                  ...p,
+                  addedByType: e.target.value as 'staff' | 'owner',
+                }))
+              }
+            >
+              <option value="staff">Staff</option>
+              <option value="owner">Owner</option>
+            </Select>
+
+            <Select
+              label="Owner Approval"
+              value={chargeForm.approvalRequired ? 'yes' : 'no'}
+              onChange={(e) =>
+                setChargeForm((p) => ({
+                  ...p,
+                  approvalRequired: e.target.value === 'yes',
+                }))
+              }
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </Select>
+          </div>
+
+          <Input
+            label="Approval Note"
+            value={chargeForm.approvalNote}
+            onChange={(e) => setChargeForm((p) => ({ ...p, approvalNote: e.target.value }))}
+            placeholder="Approved by owner / charge reason"
+          />
+
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Sparkles className="h-4 w-4 text-orange-500" />
+                Estimated total
+              </div>
+              <div className="text-base font-bold text-slate-900">
+                {formatCurrency(
+                  Number(chargeForm.amount || 0) *
+                    Number(chargeForm.quantity || 0) *
+                    (1 + Number(chargeForm.taxPct || 0) / 100)
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" type="button" onClick={() => setShowChargeModal(false)}>Cancel</Button>
-            <Button type="submit" loading={postCharge.isPending}>Post Charge</Button>
+            <Button variant="outline" type="button" onClick={() => setShowChargeModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={postCharge.isPending}>
+              Post Charge
+            </Button>
           </div>
         </form>
       </Modal>
@@ -1163,16 +1558,27 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
             <span className="text-sm font-medium text-amber-700">Balance Due</span>
             <span className="text-lg font-bold text-amber-900">{formatCurrency(folio.balance)}</span>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Amount (â‚¹)" type="number" min="0.01" step="0.01" value={payForm.amount} onChange={(e) => setPayForm((p) => ({ ...p, amount: e.target.value }))} required />
+            <Input
+              label="Amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={payForm.amount}
+              onChange={(e) => setPayForm((p) => ({ ...p, amount: e.target.value }))}
+              required
+            />
             <Select label="Mode" value={payForm.mode} onChange={(e) => setPayForm((p) => ({ ...p, mode: e.target.value }))}>
               {Object.entries(PAYMENT_MODE_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
             </Select>
           </div>
+
           <Input label="Reference" value={payForm.reference} onChange={(e) => setPayForm((p) => ({ ...p, reference: e.target.value }))} />
           <Input label="Notes" value={payForm.notes} onChange={(e) => setPayForm((p) => ({ ...p, notes: e.target.value }))} />
+
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={() => setShowPayModal(false)}>Cancel</Button>
             <Button type="submit" loading={postPayment.isPending}>Record Payment</Button>
@@ -1192,9 +1598,26 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
             });
           }}
         >
-          <Input label="Description" value={discountForm.description} onChange={(e) => setDiscountForm((p) => ({ ...p, description: e.target.value }))} required />
-          <Input label="Amount (â‚¹)" type="number" min="0.01" step="0.01" value={discountForm.amount} onChange={(e) => setDiscountForm((p) => ({ ...p, amount: e.target.value }))} required />
-          <Input label="Reason" value={discountForm.reason} onChange={(e) => setDiscountForm((p) => ({ ...p, reason: e.target.value }))} />
+          <Input
+            label="Description"
+            value={discountForm.description}
+            onChange={(e) => setDiscountForm((p) => ({ ...p, description: e.target.value }))}
+            required
+          />
+          <Input
+            label="Amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={discountForm.amount}
+            onChange={(e) => setDiscountForm((p) => ({ ...p, amount: e.target.value }))}
+            required
+          />
+          <Input
+            label="Reason"
+            value={discountForm.reason}
+            onChange={(e) => setDiscountForm((p) => ({ ...p, reason: e.target.value }))}
+          />
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" type="button" onClick={() => setShowDiscountModal(false)}>Cancel</Button>
             <Button type="submit" loading={addDiscount.isPending}>Apply Discount</Button>
@@ -1216,7 +1639,15 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
           }}
         >
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Amount (â‚¹)" type="number" min="0.01" step="0.01" value={refundForm.amount} onChange={(e) => setRefundForm((p) => ({ ...p, amount: e.target.value }))} required />
+            <Input
+              label="Amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={refundForm.amount}
+              onChange={(e) => setRefundForm((p) => ({ ...p, amount: e.target.value }))}
+              required
+            />
             <Select label="Mode" value={refundForm.mode} onChange={(e) => setRefundForm((p) => ({ ...p, mode: e.target.value }))}>
               {Object.entries(PAYMENT_MODE_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
@@ -1244,7 +1675,15 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
             });
           }}
         >
-          <Input label="Amount (â‚¹)" type="number" min="0.01" step="0.01" value={advanceForm.amount} onChange={(e) => setAdvanceForm((p) => ({ ...p, amount: e.target.value }))} required />
+          <Input
+            label="Amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={advanceForm.amount}
+            onChange={(e) => setAdvanceForm((p) => ({ ...p, amount: e.target.value }))}
+            required
+          />
           <Input label="Reference" value={advanceForm.reference} onChange={(e) => setAdvanceForm((p) => ({ ...p, reference: e.target.value }))} />
           <Input label="Notes" value={advanceForm.notes} onChange={(e) => setAdvanceForm((p) => ({ ...p, notes: e.target.value }))} />
           <div className="flex justify-end gap-2 pt-2">
@@ -1266,6 +1705,7 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
             <span className="text-sm font-medium text-rose-700">Remaining Balance</span>
             <span className="text-lg font-bold text-rose-900">{formatCurrency(folio.balance)}</span>
           </div>
+
           <Select label="Settlement Mode" value={settleForm.mode} onChange={(e) => setSettleForm((p) => ({ ...p, mode: e.target.value }))}>
             {Object.entries(PAYMENT_MODE_LABELS).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
@@ -1320,6 +1760,107 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
   );
 }
 
+function SettledGuestsTable() {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['folio-bottom-summary', date],
+    queryFn: () =>
+      api
+        .get('/api/folios/reconciliation/daily', { params: { date } })
+        .then((r) => r.data.data),
+  });
+
+  return (
+    <Card className="border-white/60 bg-white/85 shadow-xl backdrop-blur">
+      <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SectionTitle
+            title="Guest Billing Summary"
+            subtitle="All billed guest folios for the selected date"
+          />
+          <div className="w-44">
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-4">
+        {isLoading ? (
+          <div className="flex justify-center py-10">
+            <Spinner />
+          </div>
+        ) : !data?.rows?.length ? (
+          <EmptyState
+            title="No billed guests found"
+            description="No folio billing records are available for the selected date."
+          />
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-slate-100">
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Folio</Th>
+                  <Th>Guest</Th>
+                  <Th>Booking</Th>
+                  <Th>Room</Th>
+                  <Th>Charges</Th>
+                  <Th>Payments</Th>
+                  <Th>Balance</Th>
+                  <Th>Invoice</Th>
+                  <Th>Status</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((row: any, index: number) => {
+                  const rowKey = String(row?.folioId || row?.folioNumber || `row-${index}`);
+
+                  return (
+                    <Tr key={rowKey}>
+                      <Td className="font-mono text-xs">{row.folioNumber || '-'}</Td>
+                      <Td className="text-sm font-medium text-slate-800">
+                        {row.guestName || '-'}
+                      </Td>
+                      <Td className="text-xs text-slate-500">{row.bookingRef || '-'}</Td>
+                      <Td className="text-sm">{row.roomNumber || '-'}</Td>
+                      <Td className="font-medium">{formatCurrency(row.totalCharges || 0)}</Td>
+                      <Td className="text-emerald-700 font-medium">
+                        {formatCurrency(row.totalPayments || 0)}
+                      </Td>
+                      <Td
+                        className={cn(
+                          'font-semibold',
+                          row.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
+                        )}
+                      >
+                        {formatCurrency(row.balance || 0)}
+                      </Td>
+                      <Td className="font-mono text-xs text-slate-500">
+                        {row.gstInvoiceNo || 'Not generated'}
+                      </Td>
+                      <Td>
+                        {row.settled ? (
+                          <Badge variant="success">Settled</Badge>
+                        ) : (
+                          <Badge variant="danger">Open</Badge>
+                        )}
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function BillingContent() {
   const searchParams = useSearchParams();
   const [selectedFolioId, setSelectedFolioId] = useState<string | null>(searchParams.get('folioId'));
@@ -1329,15 +1870,17 @@ function BillingContent() {
     <DashboardLayout title="Billing">
       <div className="space-y-5">
         <div className="overflow-hidden rounded-[28px] border border-white/60 bg-white/70 shadow-xl backdrop-blur">
-          <div className="bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.18),_transparent_24%),radial-gradient(circle_at_top_right,_rgba(236,72,153,0.18),_transparent_24%),linear-gradient(135deg,_#fff7ed,_#fff1f2_45%,_#ffffff)] p-6">
+          <div className="bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_24%),radial-gradient(circle_at_top_right,rgba(236,72,153,0.18),transparent_24%),linear-gradient(135deg,#fff7ed,#fff1f2_45%,#ffffff)] p-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="rounded-3xl bg-gradient-to-br from-orange-500 via-pink-500 to-rose-500 p-3 text-white shadow-lg">
                   <Receipt className="h-6 w-6" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-slate-900">Billing & Folios</h1>
-                  <p className="text-sm text-slate-600">Cashier console for charges, payments, settlement, GST invoices and reconciliation.</p>
+                  <h1 className="text-2xl font-bold text-slate-900">Billing Folios</h1>
+                  <p className="text-sm text-slate-600">
+                    Cashier console for charges, payments, settlement, GST invoices and reconciliation.
+                  </p>
                 </div>
               </div>
 
@@ -1385,29 +1928,35 @@ function BillingContent() {
 
         {showRecon ? <ReconciliationPanel /> : null}
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="lg:col-span-1">
-            <FolioListPanel onSelect={setSelectedFolioId} selectedFolioId={selectedFolioId} />
-          </div>
-
-          <div className="lg:col-span-2">
-            {selectedFolioId ? (
-              <FolioDetailPanel folioId={selectedFolioId} />
-            ) : (
-              <Card className="border-white/60 bg-white/80 shadow-xl backdrop-blur">
-                <div className="flex flex-col items-center justify-center py-24 text-center">
-                  <div className="mb-4 rounded-3xl bg-gradient-to-br from-orange-500 to-pink-500 p-4 text-white shadow-lg">
-                    <Receipt className="h-8 w-8" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-slate-900">Select a folio</h3>
-                  <p className="mt-2 max-w-sm text-sm text-slate-500">
-                    Pick an open or unsettled folio from the left to manage charges, payments, settlement, invoice preview and reconciliation actions.
-                  </p>
-                </div>
-              </Card>
-            )}
-          </div>
+       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-1">
+          <FolioListPanel
+            onSelect={setSelectedFolioId}
+            selectedFolioId={selectedFolioId}
+          />
         </div>
+
+  <div className="lg:col-span-2">
+    {selectedFolioId ? (
+      <FolioDetailPanel folioId={selectedFolioId} />
+    ) : (
+      <Card className="border-white/60 bg-white/80 shadow-xl backdrop-blur">
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="mb-4 rounded-3xl bg-gradient-to-br from-orange-500 to-pink-500 p-4 text-white shadow-lg">
+            <Receipt className="h-8 w-8" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900">Select a folio</h3>
+          <p className="mt-2 max-w-sm text-sm text-slate-500">
+            Pick an open or unsettled folio from the left to manage charges, payments,
+            settlement, invoice preview and reconciliation actions.
+          </p>
+        </div>
+      </Card>
+    )}
+  </div>
+</div>
+
+<SettledGuestsTable />
       </div>
     </DashboardLayout>
   );
