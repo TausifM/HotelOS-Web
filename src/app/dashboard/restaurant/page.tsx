@@ -1405,7 +1405,6 @@ export default function Index() {
                         onChange={(e) =>
                           patchForm({
                             name: e.target.value,
-                            itemId: "",
                           })
                         }
                         placeholder="Type custom item name..."
