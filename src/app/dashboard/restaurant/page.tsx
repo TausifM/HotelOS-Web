@@ -311,18 +311,28 @@ export default function Index() {
   }
 
   function placeOrder() {
-    if (!selectedItems.length) return;
-    const placeOrderMutation = useMutation({
-      mutationFn: (payload: {
-        items: { name: string; price: number; quantity: number }[];
-        orderType: "room_service" | "dine_in";
-        roomNumber?: string;
-        tableNumber?: string;
-        reservationId?: string;
-        guestId?: string;
-      }) => api.post("/api/restaurant/orders", payload),
-    })
+  if (!selectedItems.length) return;
+
+  if (orderType === "room_service" && !roomNumber) {
+    toast.error("Please select a room");
+    return;
   }
+
+  if (orderType === "dine_in" && !tableNumber.trim()) {
+    toast.error("Please enter a table number");
+    return;
+  }
+
+  placeOrderMutation.mutate({
+    items: selectedItems,
+    orderType,
+    roomNumber: orderType === "room_service" ? roomNumber : undefined,
+    tableNumber: orderType === "dine_in" ? tableNumber.trim() : undefined,
+    total,
+    reservationId: selectedReservation?._id || selectedReservation?.id,
+    guestId: selectedGuest?._id || selectedGuest?.id,
+  });
+}
 
   function updateStatus(id: string, status: Order["status"]) {
     updateStatusMutation.mutate({ id, status });
@@ -670,7 +680,10 @@ export default function Index() {
                             setSelectedRoomId(roomId);
 
                             const room = rooms.find((r: any) => (r._id || r.id) === roomId);
-                            setSelectedRoomNumber(room?.number || '');
+                            const roomNo = String(room?.number || "");
+
+                            setSelectedRoomNumber(roomNo);
+                            setRoomNumber(roomNo);
 
                             setSelectedGuest(null);
                             setSelectedReservation(null);
@@ -680,12 +693,13 @@ export default function Index() {
                             }
                           }}
                           disabled={roomsLoading}
+
                           className="
-            h-11 w-full appearance-none rounded-xl border border-input bg-background
-            pl-10 pr-10 text-sm text-foreground shadow-sm outline-none transition-all
-            focus:border-transparent focus:ring-2 focus:ring-orange-400
-            disabled:cursor-not-allowed disabled:opacity-60
-          "
+                            h-11 w-full appearance-none rounded-xl border border-input bg-background
+                            pl-10 pr-10 text-sm text-foreground shadow-sm outline-none transition-all
+                            focus:border-transparent focus:ring-2 focus:ring-orange-400
+                            disabled:cursor-not-allowed disabled:opacity-60
+                          "
                         >
                           <option value="">
                             {roomsLoading ? 'Loading rooms...' : 'Select room'}
@@ -855,12 +869,12 @@ export default function Index() {
                       {/* ── Trigger ── */}
                       <AccordionTrigger
                         className="
-            group w-full flex items-center justify-between
-            px-3 sm:px-4 py-3
-            hover:bg-orange-50/50 hover:no-underline transition-colors
-            data-[state=open]:border-b data-[state=open]:border-orange-100
-            [&>svg]:hidden
-          "
+                        group w-full flex items-center justify-between
+                        px-3 sm:px-4 py-3
+                        hover:bg-orange-50/50 hover:no-underline transition-colors
+                        data-[state=open]:border-b data-[state=open]:border-orange-100
+                        [&>svg]:hidden
+                      "
                       >
                         {/* Left — icon + label + count badge */}
                         <div className="flex items-center gap-2">
@@ -980,8 +994,9 @@ export default function Index() {
                   type="button"
                   onClick={placeOrder}
                   disabled={
+                    placeOrderMutation.isPending ||
                     !selectedItems.length ||
-                    (orderType === 'room_service' ? !roomNumber : !tableNumber)
+                    (orderType === "room_service" ? !roomNumber : !tableNumber.trim())
                   }
                   className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{
