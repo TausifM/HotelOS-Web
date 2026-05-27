@@ -53,12 +53,11 @@ const fetchMenu = async () => {
 
 export default function Index() {
   const qc = useQueryClient();
-
+  const [dineInGuestPhone, setDineInGuestPhone] = useState("");
   /* ─── Queries ──────────────────────────────────────────────────────────── */
   const {
     data: orders = [],
     isLoading: ordersLoading,
-    refetch: refetchOrders,
   } = useQuery({
     queryKey: ["restaurant-orders"],
     queryFn: () => fetchOrders(),
@@ -84,16 +83,19 @@ export default function Index() {
       total: number;
       reservationId?: string;
       guestId?: string;
+      guestPhone?: string;
     }) => api.post("/api/restaurant/orders", payload),
     onSuccess: () => {
-      toast.success("Order placed successfully! 🎉");
+      toast.success("Order placed successfully!");
       qc.invalidateQueries({ queryKey: ["restaurant-orders"] });
       setShowOrderModal(false);
       setSelectedItems([]);
       setRoomNumber("");
       setTableNumber("");
+      setDineInGuestPhone("");
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to place order"),
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.message ?? "Failed to place order"),
   });
 
   const updateStatusMutation = useMutation({
@@ -311,28 +313,32 @@ export default function Index() {
   }
 
   function placeOrder() {
-  if (!selectedItems.length) return;
+    if (!selectedItems.length) return;
 
-  if (orderType === "room_service" && !roomNumber) {
-    toast.error("Please select a room");
-    return;
+    placeOrderMutation.mutate({
+      items: selectedItems.map((i) => ({
+        name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+      })),
+      orderType,
+      roomNumber: orderType === "room_service" ? roomNumber : undefined,
+      tableNumber: orderType === "dine_in" ? tableNumber.trim() : undefined,
+      reservationId:
+        orderType === "room_service"
+          ? selectedReservation?._id || selectedReservation?.id
+          : undefined,
+      guestId:
+        orderType === "room_service"
+          ? selectedGuest?._id || selectedGuest?.id
+          : undefined,
+      guestPhone:
+        orderType === "dine_in" && dineInGuestPhone.trim()
+          ? dineInGuestPhone.trim()
+          : undefined,
+      total,
+    });
   }
-
-  if (orderType === "dine_in" && !tableNumber.trim()) {
-    toast.error("Please enter a table number");
-    return;
-  }
-
-  placeOrderMutation.mutate({
-    items: selectedItems,
-    orderType,
-    roomNumber: orderType === "room_service" ? roomNumber : undefined,
-    tableNumber: orderType === "dine_in" ? tableNumber.trim() : undefined,
-    total,
-    reservationId: selectedReservation?._id || selectedReservation?.id,
-    guestId: selectedGuest?._id || selectedGuest?.id,
-  });
-}
 
   function updateStatus(id: string, status: Order["status"]) {
     updateStatusMutation.mutate({ id, status });
@@ -446,6 +452,103 @@ export default function Index() {
     { label: "Delivered", value: orders.filter((o) => o.status === "delivered").length, icon: CheckCircle2, gradient: "bg-gradient-to-br from-emerald-500 to-teal-600" },
   ];
 
+  function fmtDate(value?: string) {
+    if (!value) return "—";
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("en-IN");
+  }
+
+  function guestName(o: any) {
+    if (!o.guestId) return "—";
+    if (typeof o.guestId === "string") return o.guestId;
+    return o.guestId.fullName || `${o.guestId.firstName || ""} ${o.guestId.lastName || ""}`.trim() || "—";
+  }
+  function guestPhone(o: any) {
+    const phone =
+      o?.guestPhone ||
+      (typeof o?.guestId === "object"
+        ? o.guestId?.phone || o.guestId?.mobile
+        : undefined);
+
+    return phone ? String(phone) : "—";
+  }
+
+  function guestIdValue(o: any) {
+    if (!o.guestId) return "—";
+    if (typeof o.guestId === "string") return o.guestId;
+    return o.guestId._id || o.guestId.id || "—";
+  }
+
+  function itemSummary(items: any[] = []) {
+    if (!items.length) return "—";
+    return items.map((i) => `${i.quantity}× ${i.name}`).join(", ");
+  }
+  function shortId(value?: string) {
+    if (!value) return "—";
+    return `${value.slice(0, 6)}...${value.slice(-4)}`;
+  }
+
+  function locationLabel(o: any) {
+    if (o.orderType === "room_service") return o.roomNumber ? `Room ${o.roomNumber}` : "Room —";
+    if (o.orderType === "dine_in") return o.tableNumber ? `Table ${o.tableNumber}` : "Table —";
+    return "—";
+  }
+
+  function totalItems(items: any[] = []) {
+    return items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  }
+
+  function statusTone(status?: string) {
+    switch (status) {
+      case "delivered":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "cancelled":
+        return "bg-rose-50 text-rose-700 border-rose-200";
+      case "ready":
+        return "bg-violet-50 text-violet-700 border-violet-200";
+      case "preparing":
+        return "bg-blue-50 text-blue-700 border-blue-200";
+      default:
+        return "bg-amber-50 text-amber-700 border-amber-200";
+    }
+  }
+  const COMPLETED_PAGE_SIZE = 8;
+
+  const [completedPage, setCompletedPage] = useState(1);
+
+  const completedDeliveredCount = useMemo(
+    () => completed.filter((o) => o.status === "delivered").length,
+    [completed]
+  );
+
+  const completedCancelledCount = useMemo(
+    () => completed.filter((o) => o.status === "cancelled").length,
+    [completed]
+  );
+
+  const completedRevenue = useMemo(
+    () =>
+      completed
+        .filter((o) => o.status === "delivered")
+        .reduce((sum, o) => sum + Number(o.total || 0), 0),
+    [completed]
+  );
+
+  const completedPageCount = Math.max(
+    1,
+    Math.ceil(completed.length / COMPLETED_PAGE_SIZE)
+  );
+
+  const paginatedCompleted = useMemo(() => {
+    const start = (completedPage - 1) * COMPLETED_PAGE_SIZE;
+    return completed.slice(start, start + COMPLETED_PAGE_SIZE);
+  }, [completed, completedPage]);
+
+  useEffect(() => {
+    if (completedPage > completedPageCount) {
+      setCompletedPage(completedPageCount);
+    }
+  }, [completedPage, completedPageCount]);
   /* ─── Loading skeleton ─────────────────────────────────────────────────── */
   if (ordersLoading || menuLoading) {
     return (
@@ -530,66 +633,434 @@ export default function Index() {
           {/* COMPLETED */}
           {completed.length > 0 && (
             <section className="mt-10">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-display text-2xl font-bold tracking-tight">
-                  Completed Today
-                </h2>
-                <Badge className="rounded-full">{completed.length}</Badge>
+              <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-display text-2xl font-bold tracking-tight text-slate-900">
+                      Completed Today
+                    </h2>
+                    <Badge className="rounded-full border-0 bg-gradient-warm text-primary-foreground shadow-sm">
+                      {completed.length} orders
+                    </Badge>
+                  </div>
+
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Refined table view with richer order cards, expandable details, and invoice access
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 shadow-sm">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-600">
+                      Delivered
+                    </p>
+                    <p className="mt-1 text-xl font-bold text-emerald-900">
+                      {completedDeliveredCount}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-3 shadow-sm">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-600">
+                      Cancelled
+                    </p>
+                    <p className="mt-1 text-xl font-bold text-rose-900">
+                      {completedCancelledCount}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-rose-50 px-4 py-3 shadow-sm">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-orange-600">
+                      Delivered Revenue
+                    </p>
+                    <p className="mt-1 text-xl font-bold text-slate-900">
+                      ₹{completedRevenue.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="overflow-hidden rounded-3xl bg-card shadow-card">
+              <div className="overflow-hidden rounded-[30px] border border-border/60 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
+                <div className="border-b border-slate-100 bg-gradient-to-r from-orange-50/80 via-white to-rose-50/70 px-5 py-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-orange-700">
+                        Page {completedPage} / {completedPageCount}
+                      </span>
+                      <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600">
+                        Showing {paginatedCompleted.length} of {completed.length}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() => setCompletedPage((p) => Math.max(1, p - 1))}
+                        disabled={completedPage === 1}
+                      >
+                        Prev
+                      </Button>
+
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: completedPageCount }).slice(0, 7).map((_, i) => {
+                          const page = i + 1;
+                          const active = page === completedPage;
+
+                          return (
+                            <button
+                              key={page}
+                              type="button"
+                              onClick={() => setCompletedPage(page)}
+                              className={[
+                                "h-9 min-w-[36px] rounded-full px-3 text-xs font-bold transition-all",
+                                active
+                                  ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-md"
+                                  : "border border-slate-200 bg-white text-slate-600 hover:border-orange-200 hover:text-orange-600",
+                              ].join(" ")}
+                            >
+                              {page}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() =>
+                          setCompletedPage((p) => Math.min(completedPageCount, p + 1))
+                        }
+                        disabled={completedPage === completedPageCount}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="w-full overflow-x-auto">
-                  <table className="min-w-[760px] w-full text-sm">
-                    <thead className="bg-secondary/60 text-xs uppercase tracking-wider text-foreground">
-                      <tr>
-                        <th className="px-5 py-3 text-left whitespace-nowrap">Items</th>
-                        <th className="px-5 py-3 text-left whitespace-nowrap">Type</th>
-                        <th className="px-5 py-3 text-left whitespace-nowrap">Location</th>
-                        <th className="px-5 py-3 text-right whitespace-nowrap">Amount</th>
-                        <th className="px-5 py-3 text-left whitespace-nowrap">Status</th>
-                        <th className="px-5 py-3 text-right whitespace-nowrap">Invoice</th>
+                  <table className="min-w-[1220px] w-full">
+                    <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur supports-[backdrop-filter]:bg-slate-50/75">
+                      <tr className="border-b border-border">
+                        <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          Order
+                        </th>
+                        <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          Guest / Location
+                        </th>
+                        <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          Items
+                        </th>
+                        <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          Timeline
+                        </th>
+                        <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          Total
+                        </th>
+                        <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          Status
+                        </th>
+                        <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          Details
+                        </th>
+                        <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          Invoice
+                        </th>
                       </tr>
                     </thead>
 
                     <tbody>
-                      {completed.slice(0, 10).map((o) => (
+                      {paginatedCompleted.map((o: any, idx: number) => (
                         <tr
                           key={o._id}
-                          className="border-t border-border transition-smooth hover:bg-secondary/30"
+                          className={[
+                            "group align-top border-b border-border/60 transition-all duration-200",
+                            idx % 2 === 0 ? "bg-white" : "bg-slate-50/35",
+                            "hover:bg-orange-50/40",
+                          ].join(" ")}
                         >
-                          <td className="px-5 py-3 whitespace-nowrap">
-                            {o.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}
+                          {/* ORDER */}
+                          <td className="px-5 py-4">
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="inline-flex rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+                                  {o.orderType?.replace("_", " ") || "order"}
+                                </span>
+
+                                <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">
+                                  {shortId(o._id)}
+                                </span>
+                              </div>
+
+                              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2">
+                                <div className="text-xs text-slate-500">
+                                  Tenant:{" "}
+                                  <span className="font-medium text-slate-700">
+                                    {shortId(o.tenantId)}
+                                  </span>
+                                </div>
+
+                                <div className="mt-1 text-xs text-slate-500">
+                                  Staff:{" "}
+                                  <span className="font-medium text-slate-700">
+                                    {shortId(o.staffId)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
                           </td>
-                          <td className="px-5 py-3 capitalize whitespace-nowrap">
-                            {o.orderType.replace("_", " ")}
+
+                          {/* GUEST / LOCATION */}
+                          <td className="px-5 py-4">
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {guestName(o)}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {guestPhone(o)}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                <span className="inline-flex rounded-full border border-orange-100 bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-orange-700">
+                                  {locationLabel(o)}
+                                </span>
+
+                                {o.reservationId && (
+                                  <span className="inline-flex rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
+                                    Resv {shortId(o.reservationId)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </td>
-                          <td className="px-5 py-3 whitespace-nowrap">
-                            {o.roomNumber || o.tableNumber || "—"}
+
+                          {/* ITEMS */}
+                          <td className="min-w-[260px] px-5 py-4">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                  {totalItems(o.items)} items
+                                </span>
+                              </div>
+
+                              <div className="rounded-2xl border border-slate-100 bg-white/80 p-3 shadow-sm">
+                                <div className="space-y-1.5">
+                                  {(o.items || []).slice(0, 3).map((item: any) => (
+                                    <div
+                                      key={item._id || `${item.name}-${item.price}`}
+                                      className="flex items-center justify-between gap-2 text-xs"
+                                    >
+                                      <span className="truncate text-slate-700">
+                                        {item.quantity}× {item.name}
+                                      </span>
+                                      <span className="font-semibold text-slate-900">
+                                        ₹{((item.price || 0) * (item.quantity || 0)).toLocaleString("en-IN")}
+                                      </span>
+                                    </div>
+                                  ))}
+
+                                  {(o.items || []).length > 3 && (
+                                    <p className="pt-1 text-[11px] font-medium text-orange-600">
+                                      + {(o.items || []).length - 3} more items
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           </td>
-                          <td className="px-5 py-3 text-right font-semibold whitespace-nowrap">
-                            ₹{o.total}
+
+                          {/* TIMELINE */}
+                          <td className="px-5 py-4">
+                            <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-xs">
+                              <div>
+                                <p className="font-semibold text-slate-800">Created</p>
+                                <p className="text-slate-500">{fmtDate(o.createdAt)}</p>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-slate-800">Updated</p>
+                                <p className="text-slate-500">{fmtDate(o.updatedAt)}</p>
+                              </div>
+                            </div>
                           </td>
-                          <td className="px-5 py-3 whitespace-nowrap">
-                            <Badge
-                              variant={o.status === "delivered" ? "success" : "warning"}
-                              className="rounded-full capitalize"
+
+                          {/* TOTAL */}
+                          <td className="px-5 py-4 text-right">
+                            <div className="inline-flex rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-rose-50 px-4 py-2 shadow-sm">
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-orange-500">
+                                  Total
+                                </p>
+                                <p className="text-base font-bold text-slate-900">
+                                  ₹{Number(o.total ?? 0).toLocaleString("en-IN")}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* STATUS */}
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-bold capitalize ${statusTone(
+                                o.status
+                              )}`}
                             >
-                              {o.status}
-                            </Badge>
+                              {o.status || "—"}
+                            </span>
+
+                            <div className="mt-2">
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${o.kotPrinted
+                                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border border-slate-200 bg-slate-100 text-slate-600"
+                                  }`}
+                              >
+                                KOT: {o.kotPrinted ? "Printed" : "Pending"}
+                              </span>
+                            </div>
                           </td>
-                          <td className="px-5 py-3 text-right whitespace-nowrap">
-                            {o.status === "delivered" && (
+
+                          {/* DETAILS */}
+                          <td className="min-w-[340px] px-5 py-4">
+                            <Accordion type="single" collapsible className="w-full">
+                              <AccordionItem
+                                value={`details-${o._id}`}
+                                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all group-hover:border-orange-200"
+                              >
+                                <AccordionTrigger className="px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50 hover:no-underline">
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-pink-500 text-xs text-white shadow-sm">
+                                      +
+                                    </span>
+                                    Full details
+                                  </div>
+                                </AccordionTrigger>
+
+                                <AccordionContent className="border-t border-slate-100 bg-slate-50/70 px-4 py-4">
+                                  <div className="grid grid-cols-2 gap-3 text-xs">
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        Order ID
+                                      </p>
+                                      <p className="mt-1 break-all font-medium text-slate-700">
+                                        {o._id || "—"}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        Tenant ID
+                                      </p>
+                                      <p className="mt-1 break-all font-medium text-slate-700">
+                                        {o.tenantId || "—"}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        Reservation ID
+                                      </p>
+                                      <p className="mt-1 break-all font-medium text-slate-700">
+                                        {o.reservationId || "—"}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        Guest ID
+                                      </p>
+                                      <p className="mt-1 break-all font-medium text-slate-700">
+                                        {guestIdValue(o)}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        Guest Name
+                                      </p>
+                                      <p className="mt-1 font-medium text-slate-700">
+                                        {guestName(o)}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        Guest Phone
+                                      </p>
+                                      <p className="mt-1 font-medium text-slate-700">
+                                        {guestPhone(o)}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        Room
+                                      </p>
+                                      <p className="mt-1 font-medium text-slate-700">
+                                        {o.roomNumber || "—"}
+                                      </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        Table
+                                      </p>
+                                      <p className="mt-1 font-medium text-slate-700">
+                                        {o.tableNumber || "—"}
+                                      </p>
+                                    </div>
+
+                                    <div className="col-span-2 rounded-xl border border-slate-200 bg-white p-3">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                        Items
+                                      </p>
+                                      <div className="mt-2 space-y-2">
+                                        {(o.items || []).map((item: any) => (
+                                          <div
+                                            key={item._id || `${item.name}-${item.price}`}
+                                            className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
+                                          >
+                                            <div>
+                                              <p className="text-sm font-medium text-slate-800">
+                                                {item.quantity}× {item.name}
+                                              </p>
+                                              <p className="text-[11px] text-slate-500">
+                                                ₹{item.price} each
+                                              </p>
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-900">
+                                              ₹{((item.price || 0) * (item.quantity || 0)).toLocaleString("en-IN")}
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            </Accordion>
+                          </td>
+
+                          {/* INVOICE */}
+                          <td className="px-5 py-4 text-right">
+                            {o.status === "delivered" ? (
                               <button
                                 onClick={() => setInvoiceOrder(o)}
-                                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+                                className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-white shadow-md transition-all hover:scale-[1.02] hover:shadow-lg"
                                 style={{
                                   background: "linear-gradient(135deg,#F97316,#F43F5E)",
-                                  color: "#fff",
                                 }}
                               >
-                                <FileText className="h-3 w-3" />
+                                <FileText className="h-3.5 w-3.5" />
                                 Invoice
                               </button>
+                            ) : (
+                              <span className="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400">
+                                Not available
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -597,6 +1068,72 @@ export default function Index() {
                     </tbody>
                   </table>
                 </div>
+
+                {completedPageCount > 1 && (
+                  <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-slate-500">
+                        Showing{" "}
+                        <span className="font-semibold text-slate-800">
+                          {(completedPage - 1) * COMPLETED_PAGE_SIZE + 1}
+                        </span>{" "}
+                        to{" "}
+                        <span className="font-semibold text-slate-800">
+                          {Math.min(completedPage * COMPLETED_PAGE_SIZE, completed.length)}
+                        </span>{" "}
+                        of{" "}
+                        <span className="font-semibold text-slate-800">
+                          {completed.length}
+                        </span>{" "}
+                        completed orders
+                      </p>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => setCompletedPage(1)}
+                          disabled={completedPage === 1}
+                        >
+                          First
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => setCompletedPage((p) => Math.max(1, p - 1))}
+                          disabled={completedPage === 1}
+                        >
+                          Prev
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() =>
+                            setCompletedPage((p) => Math.min(completedPageCount, p + 1))
+                          }
+                          disabled={completedPage === completedPageCount}
+                        >
+                          Next
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => setCompletedPage(completedPageCount)}
+                          disabled={completedPage === completedPageCount}
+                        >
+                          Last
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           )}
@@ -749,14 +1286,33 @@ export default function Index() {
                       ) : null}
                     </div>
                   ) : (
-                    <div className="relative">
-                      <Utensils className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        value={tableNumber}
-                        onChange={(e) => setTableNumber(e.target.value)}
-                        placeholder="Enter table number (e.g. T3)"
-                        className="h-11 rounded-xl pl-10 text-sm"
-                      />
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Utensils className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={tableNumber}
+                          onChange={(e) => setTableNumber(e.target.value)}
+                          placeholder="Enter table number (e.g. T3)"
+                          className="h-11 rounded-xl pl-10 text-sm"
+                        />
+                      </div>
+
+                      <div className="relative">
+                        <Input
+                          value={dineInGuestPhone}
+                          onChange={(e) => setDineInGuestPhone(e.target.value)}
+                          placeholder="Guest phone (optional)"
+                          className="h-11 rounded-xl text-sm"
+                          inputMode="tel"
+                          maxLength={15}
+                        />
+                      </div>
+
+                      {dineInGuestPhone && (
+                        <p className="px-1 text-[11px] text-slate-500">
+                          Phone is optional for dine-in orders.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
