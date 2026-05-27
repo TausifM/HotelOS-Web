@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "@/components/layout/Providers";
 import "./globals.css";
+import { ReactNode } from "react";
+import AuthHydrator from "@/components/auth/AuthHydrator";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -108,7 +110,7 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <html
@@ -250,7 +252,10 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${inter.className} font-sans antialiased bg-[#FDFCFB] text-gray-900`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <AuthHydrator />
+          {children}
+          </Providers>
       </body>
     </html>
   );

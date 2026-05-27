@@ -31,12 +31,30 @@ interface AuthState {
   tenant: TenantInfo | null;
   isAuthenticated: boolean;
   isSuperAdmin: boolean;
-  login: (data: { accessToken: string; refreshToken?: string; staff: StaffUser; tenant?: TenantInfo }) => void;
+  isHydrated: boolean;
+  isCheckingAuth: boolean;
+
+  setHydrated: () => void;
+  setCheckingAuth: (v: boolean) => void;
+
+  setSession: (data: {
+    staff: StaffUser;
+    tenant?: TenantInfo | null;
+    accessToken?: string | null;
+    refreshToken?: string | null;
+  }) => void;
+
+  login: (data: {
+    accessToken?: string | null;
+    refreshToken?: string | null;
+    staff: StaffUser;
+    tenant?: TenantInfo | null;
+  }) => void;
+
+  clearSession: () => void;
   logout: () => void;
-  updateToken: (token: string) => void;
+  updateToken: (token: string | null) => void;
   updateTenant: (tenant: Partial<TenantInfo>) => void;
-  isHydrated: boolean; // ✅ NEW
-  setHydrated: () => void; // ✅ NEW
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -48,19 +66,40 @@ export const useAuthStore = create<AuthState>()(
       tenant: null,
       isAuthenticated: false,
       isSuperAdmin: false,
-
-      // ✅ NEW
       isHydrated: false,
-      setHydrated: () => set({ isHydrated: true }),
+      isCheckingAuth: true,
 
-      login: ({ accessToken, refreshToken, staff, tenant }) =>
+      setHydrated: () => set({ isHydrated: true }),
+      setCheckingAuth: (v) => set({ isCheckingAuth: v }),
+
+      setSession: ({ staff, tenant, accessToken = null, refreshToken = null }) =>
         set({
           accessToken,
-          refreshToken: refreshToken ?? null,
+          refreshToken,
           staff,
           tenant: tenant ?? null,
           isAuthenticated: true,
           isSuperAdmin: staff.role === 'superadmin',
+        }),
+
+      login: ({ accessToken = null, refreshToken = null, staff, tenant }) =>
+        set({
+          accessToken,
+          refreshToken,
+          staff,
+          tenant: tenant ?? null,
+          isAuthenticated: true,
+          isSuperAdmin: staff.role === 'superadmin',
+        }),
+
+      clearSession: () =>
+        set({
+          accessToken: null,
+          refreshToken: null,
+          staff: null,
+          tenant: null,
+          isAuthenticated: false,
+          isSuperAdmin: false,
         }),
 
       logout: () =>
@@ -82,22 +121,21 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'stayos-auth',
-
+      skipHydration: true,
       partialize: (s) => ({
         accessToken: s.accessToken,
         refreshToken: s.refreshToken,
         staff: s.staff,
         tenant: s.tenant,
+        isAuthenticated: s.isAuthenticated,
+        isSuperAdmin: s.isSuperAdmin,
       }),
-
-      // ✅ THIS IS THE KEY FIX
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();
       },
     }
   )
 );
-
 interface UIState {
   sidebarOpen: boolean;
   setSidebarOpen: (v: boolean) => void;

@@ -11,12 +11,13 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     try {
-      await api.post('/api/auth/logout');
+      await api.post('/api/auth/logout', {}, { withCredentials: true });
     } catch {
-      // ignore
     }
-    store.logout();
+    store.clearSession?.();
+    store.logout?.();
     router.replace('/auth/login');
+    router.refresh();
   }, [store, router]);
 
   const hasPermission = useCallback((permission: string): boolean => {
@@ -42,6 +43,7 @@ export function useAuth() {
     isSuperAdmin: store.isSuperAdmin,
     accessToken: store.accessToken,
     isHydrated: store.isHydrated,
+    isCheckingAuth: store.isCheckingAuth,
     logout,
     hasPermission,
     hasRole,

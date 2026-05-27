@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Eye, EyeOff, Zap } from 'lucide-react';
@@ -26,7 +26,11 @@ const TOKEN = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const login = useAuthStore((s) => s.login);
+  const searchParams = useSearchParams();
+
+  const setSession = useAuthStore((s: any) => s.setSession ?? s.login);
+  const setCheckingAuth = useAuthStore((s: any) => s.setCheckingAuth);
+  const setHydrated = useAuthStore((s: any) => s.setHydrated);
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -34,21 +38,19 @@ export default function LoginPage() {
 
   const f =
     (k: keyof typeof form) =>
-      (e: React.ChangeEvent<HTMLInputElement>) =>
-        setForm((p) => ({ ...p, [k]: e.target.value }));
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((p) => ({ ...p, [k]: e.target.value }));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
     if (loading) return;
 
     setLoading(true);
+    setCheckingAuth?.(true);
 
     try {
-      console.log("LOGIN START");
-
-      const response = await api.post(
-        "/api/auth/login",
+      await api.post(
+        '/api/auth/login',
         {
           email: form.email,
           password: form.password,
@@ -59,36 +61,40 @@ export default function LoginPage() {
         }
       );
 
-      console.log("LOGIN RESPONSE", response.data);
-
-      const data = response.data;
-
-      login({
-        accessToken: data.data.accessToken,
-        refreshToken: data.data.refreshToken,
-        staff: data.data.staff,
-        tenant: data.data.tenant,
+      const meRes = await api.get('/api/auth/me', {
+        withCredentials: true,
       });
 
-      toast.success(`Welcome back, ${data.data.staff.name}!`);
+      const session = meRes.data?.data;
 
-      // Small delay prevents navigation cancellation issues
-      setTimeout(() => {
-        router.replace("/dashboard");
-      }, 100);
+      if (!session?.staff) {
+        throw new Error('Session not established');
+      }
 
+      setSession({
+        staff: session.staff,
+        tenant: session.tenant ?? null,
+      });
+
+      setHydrated?.();
+
+      toast.success(`Welcome back, ${session.staff.name}!`);
+
+      const next = searchParams.get('next') || '/dashboard';
+      router.replace(next);
+      router.refresh();
     } catch (err: any) {
-      console.error("LOGIN ERROR", err);
-
       toast.error(
         err?.response?.data?.message ||
-        err?.message ||
-        "Login failed"
+          err?.message ||
+          'Login failed'
       );
     } finally {
+      setCheckingAuth?.(false);
       setLoading(false);
     }
   }
+
   return (
     /* Full viewport, centered, no scroll */
     <div
