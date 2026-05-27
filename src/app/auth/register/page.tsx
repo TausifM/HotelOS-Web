@@ -169,15 +169,24 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
 
     try {
-      await api.post('/api/auth/register', form);
+      const res = await api.post(
+        '/api/auth/register',
+        form,
+        { withCredentials: true }
+      );
+
       setSuccess(true);
-       toast.success('Login successful');
-       router.replace('/dashboard');
+
+      toast.success(
+        res?.data?.message || 'Registration successful. Your free trial has started.'
+      );
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Registration failed');
+      toast.error(err?.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -408,7 +417,7 @@ export default function RegisterPage() {
               boxShadow: '0 24px 70px rgba(249,115,22,0.10)',
             }}
           >
-             <Link
+            <Link
               href="/"
               className="inline-flex items-center gap-2 text-sm font-medium mb-5 hover:underline"
               style={{ color: MELON }}
@@ -518,16 +527,16 @@ export default function RegisterPage() {
                   <InputWrap icon={<Phone className="w-4 h-4" />}>
                     <input
                       type="tel"
-  value={form.phone}
-  onChange={(e) =>
-    setForm((p) => ({
-      ...p,
-      phone: e.target.value.replace(/\D/g, '').slice(0, 10),
-    }))
-  }
-  placeholder="9876543210"
-  maxLength={10}
-  required
+                      value={form.phone}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          phone: e.target.value.replace(/\D/g, '').slice(0, 10),
+                        }))
+                      }
+                      placeholder="9876543210"
+                      maxLength={10}
+                      required
                       style={{ color: TOKEN.text }}
                     />
                   </InputWrap>
