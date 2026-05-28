@@ -25,6 +25,7 @@ import {
   PartyPopper,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/components/components/WhatsAppButton';
 
 interface AddressForm {
   line1: string;
@@ -71,13 +72,13 @@ const EMPTY_FORM: GuestForm = {
 };
 
 const ID_TYPES = [
-  { value: 'aadhaar',          label: 'Aadhaar Card'     },
-  { value: 'passport',         label: 'Passport'         },
-  { value: 'driving_licence',  label: 'Driving Licence'  },
-  { value: 'pan',              label: 'PAN Card'         },
-  { value: 'voter_id',         label: 'Voter ID'         },
+  { value: 'aadhaar', label: 'Aadhaar Card' },
+  { value: 'passport', label: 'Passport' },
+  { value: 'driving_licence', label: 'Driving Licence' },
+  { value: 'pan', label: 'PAN Card' },
+  { value: 'voter_id', label: 'Voter ID' },
   { value: 'foreign_passport', label: 'Foreign Passport' },
-  { value: 'other',            label: 'Other'            },
+  { value: 'other', label: 'Other' },
 ];
 
 function Field({
@@ -113,29 +114,33 @@ function Field({
 
 const inputBase =
   'w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all';
-const inputNormal    = `${inputBase} border-gray-200 bg-white text-gray-900 placeholder:text-gray-400`;
+const inputNormal = `${inputBase} border-gray-200 bg-white text-gray-900 placeholder:text-gray-400`;
 const inputHighlight = `${inputBase} border-green-300 bg-green-50 text-gray-900`;
 
 export default function NewGuestPage() {
-  const router  = useRouter();
+  const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { tenant } = useAuth();
+  console.log(tenant, "tenant")
 
-  const [step,         setStep]        = useState<1 | 2 | 3>(1);
-  const [idPreview,    setIdPreview]   = useState<string | null>(null);
-  const [ocrLoading,   setOcrLoading]  = useState(false);
-  const [ocrDone,      setOcrDone]     = useState(false);
-  const [form,         setForm]        = useState<GuestForm>(EMPTY_FORM);
+  const hotelName = tenant?.hotelName || 'Your Hotel';
+  'Your Hotel';
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [idPreview, setIdPreview] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrDone, setOcrDone] = useState(false);
+  const [form, setForm] = useState<GuestForm>(EMPTY_FORM);
   const [createdGuest, setCreatedGuest] = useState<any>(null);
 
   const f =
     (k: keyof GuestForm) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setForm((p) => ({ ...p, [k]: e.target.value }));
+      (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+        setForm((p) => ({ ...p, [k]: e.target.value }));
 
   const fAddr =
     (k: keyof AddressForm) =>
-    (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((p) => ({ ...p, address: { ...p.address, [k]: e.target.value } }));
+      (e: React.ChangeEvent<HTMLInputElement>) =>
+        setForm((p) => ({ ...p, address: { ...p.address, [k]: e.target.value } }));
 
   async function handleIdUpload(file: File) {
     if (!file) return;
@@ -158,11 +163,11 @@ export default function NewGuestPage() {
         const extracted = data.data;
 
         let firstName = '';
-        let lastName  = '';
+        let lastName = '';
         if (extracted.name) {
           const parts = extracted.name.trim().split(/\s+/);
           firstName = parts[0] || '';
-          lastName  = parts.slice(1).join(' ') || '';
+          lastName = parts.slice(1).join(' ') || '';
         }
 
         let dob = '';
@@ -178,19 +183,19 @@ export default function NewGuestPage() {
 
         setForm((p) => ({
           ...p,
-          firstName:   firstName || p.firstName,
-          lastName:    lastName  || p.lastName,
-          idType:      extracted.idType      || p.idType,
-          idNumber:    extracted.idNumber    || p.idNumber,
+          firstName: firstName || p.firstName,
+          lastName: lastName || p.lastName,
+          idType: extracted.idType || p.idType,
+          idNumber: extracted.idNumber || p.idNumber,
           nationality: extracted.nationality || p.nationality,
-          dob:         dob                   || p.dob,
-          idVerified:  true,
+          dob: dob || p.dob,
+          idVerified: true,
           address: {
             ...p.address,
-            line1:   extracted.address?.split(',')[0]?.trim() || p.address.line1,
-            city:    extracted.address?.split(',')[1]?.trim() || p.address.city,
-            state:   extracted.address?.split(',')[2]?.trim() || p.address.state,
-            pincode: extracted.pincode                        || p.address.pincode,
+            line1: extracted.address?.split(',')[0]?.trim() || p.address.line1,
+            city: extracted.address?.split(',')[1]?.trim() || p.address.city,
+            state: extracted.address?.split(',')[2]?.trim() || p.address.state,
+            pincode: extracted.pincode || p.address.pincode,
           },
           idExtractedData: extracted,
         }));
@@ -218,7 +223,14 @@ export default function NewGuestPage() {
 
       if (form.phone && form.whatsappOptIn) {
         const message =
-          `🌟 *Welcome to The Grand Mumbai! *\n\nHello ${form.firstName}!\n\nYou've been registered as a guest with us.\n\n🪪 *Membership ID:* ${guest.loyalty?.membershipId || 'Assigned'}\n🏆 *Loyalty Tier:* Bronze\n\nYou'll earn points on every stay, redeemable for discounts.\n\nWe look forward to hosting you! 🏨\n\n_Reply to this message anytime for assistance._`;
+          `🌟 *Welcome to ${hotelName}!*` +
+          `\n\nHello ${form.firstName}!` +
+          `\n\nYou've been registered as a guest with us.` +
+          `\n\n🪪 *Membership ID:* ${guest.loyalty?.membershipId || 'Assigned'}` +
+          `\n🏆 *Loyalty Tier:* Bronze` +
+          `\n\nYou'll earn points on every stay, redeemable for discounts.` +
+          `\n\nWe look forward to hosting you! 🏨` +
+          `\n\n_Reply to this message anytime for assistance._`;
 
         openWhatsApp(form.phone, message);
         toast.success('Guest registered! WhatsApp welcome opened.');
@@ -244,8 +256,8 @@ export default function NewGuestPage() {
     }
     createGuest.mutate({
       ...form,
-      whatsappNumber:  form.phone,
-      idVerified:      form.idVerified,
+      whatsappNumber: form.phone,
+      idVerified: form.idVerified,
       idExtractedData: form.idExtractedData,
     });
   }
@@ -255,7 +267,7 @@ export default function NewGuestPage() {
       {[
         { n: 1, label: 'Scan ID' },
         { n: 2, label: 'Details' },
-        { n: 3, label: 'Done'    },
+        { n: 3, label: 'Done' },
       ].map((s, i) => (
         <div key={s.n} className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
@@ -273,7 +285,7 @@ export default function NewGuestPage() {
             </div>
             <span
               className="hidden text-xs font-semibold sm:inline"
-              style={{ color: step === s.n ? 'black' : step > s.n ? '#10b981' : '#94a3b8' }}
+              style={{ color: step === s.n ? 'black' : step > s.n ? '#059669' : '#94a3b8' }}
             >
               {s.label}
             </span>
@@ -365,8 +377,8 @@ export default function NewGuestPage() {
                 onClick={() => !ocrLoading && fileRef.current?.click()}
                 className="relative cursor-pointer overflow-hidden rounded-2xl transition-all"
                 style={{
-                  border:     ocrLoading ? '2px dashed #F97316' : '2px dashed #e2e8f0',
-                  background: ocrLoading ? '#fff7ed'            : '#fafafa',
+                  border: ocrLoading ? '2px dashed #F97316' : '2px dashed #e2e8f0',
+                  background: ocrLoading ? '#fff7ed' : '#fafafa',
                 }}
               >
                 <div className="flex flex-col items-center gap-4 p-10">
@@ -553,8 +565,8 @@ export default function NewGuestPage() {
                   <div
                     className="flex items-center gap-3 rounded-xl border px-3.5 py-2.5"
                     style={{
-                      background:   form.idVerified ? '#ecfdf5' : '#f8fafc',
-                      borderColor:  form.idVerified ? '#bbf7d0' : '#e2e8f0',
+                      background: form.idVerified ? '#ecfdf5' : '#f8fafc',
+                      borderColor: form.idVerified ? '#bbf7d0' : '#e2e8f0',
                     }}
                   >
                     <input
@@ -739,7 +751,7 @@ export default function NewGuestPage() {
                 <div
                   className="cursor-pointer rounded-xl border px-4 py-3"
                   style={{
-                    background:  form.whatsappOptIn ? '#ecfdf5' : '#f8fafc',
+                    background: form.whatsappOptIn ? '#ecfdf5' : '#f8fafc',
                     borderColor: form.whatsappOptIn ? '#bbf7d0' : '#e2e8f0',
                   }}
                   onClick={() => setForm((p) => ({ ...p, whatsappOptIn: !p.whatsappOptIn }))}
@@ -838,11 +850,14 @@ export default function NewGuestPage() {
               onClick={() =>
                 openWhatsApp(
                   form.phone,
-                  `🌟 *Welcome ${form.firstName}!*\n\nYou're registered at our hotel.\nMembership ID: ${createdGuest?.loyalty?.membershipId || '—'}\n\nWe look forward to hosting you! 🏨`
+                  `🌟 *Welcome ${form.firstName}!*\n\nYou're registered at ${hotelName}.\nMembership ID: ${createdGuest?.loyalty?.membershipId || '—'}\n\nWe look forward to hosting you! 🏨`
                 )
               }
               className="flex w-full items-center justify-center gap-2.5 rounded-2xl py-3.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.99]"
-              style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', boxShadow: '0 4px 16px rgba(34,197,94,0.3)' }}
+              style={{
+                background: 'linear-gradient(135deg,#22c55e,#16a34a)',
+                boxShadow: '0 4px 16px rgba(34,197,94,0.3)',
+              }}
             >
               Send Welcome WhatsApp
             </button>
