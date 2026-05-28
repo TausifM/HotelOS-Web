@@ -11,6 +11,8 @@ import {
   ShieldAlert, Star, LogIn, LogOut, X, Check, Loader2,
   FileText, Edit2, Ban, MessageSquare, Sparkles, ExternalLink,
   CreditCard, Clock, AlertCircle, Download, ChevronRight,
+  LinkIcon,
+  MessageCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -21,11 +23,11 @@ function openWhatsApp(phone: string, message: string) {
 }
 
 const STATUS_META: Record<string, { label: string; gradient: string; bg: string; text: string }> = {
-  confirmed:   { label: 'Confirmed',   gradient: 'linear-gradient(135deg,#22c55e,#16a34a)', bg: '#ecfdf5', text: '#166534' },
-  checked_in:  { label: 'Checked In',  gradient: 'linear-gradient(135deg,#3b82f6,#2563eb)', bg: '#eff6ff', text: '#1e40af' },
+  confirmed: { label: 'Confirmed', gradient: 'linear-gradient(135deg,#22c55e,#16a34a)', bg: '#ecfdf5', text: '#166534' },
+  checked_in: { label: 'Checked In', gradient: 'linear-gradient(135deg,#3b82f6,#2563eb)', bg: '#eff6ff', text: '#1e40af' },
   checked_out: { label: 'Checked Out', gradient: 'linear-gradient(135deg,#6b7280,#4b5563)', bg: '#f9fafb', text: '#374151' },
-  cancelled:   { label: 'Cancelled',   gradient: 'linear-gradient(135deg,#ef4444,#dc2626)', bg: '#fef2f2', text: '#991b1b' },
-  inquiry:     { label: 'Inquiry',     gradient: 'linear-gradient(135deg,#f59e0b,#d97706)', bg: '#fffbeb', text: '#92400e' },
+  cancelled: { label: 'Cancelled', gradient: 'linear-gradient(135deg,#ef4444,#dc2626)', bg: '#fef2f2', text: '#991b1b' },
+  inquiry: { label: 'Inquiry', gradient: 'linear-gradient(135deg,#f59e0b,#d97706)', bg: '#fffbeb', text: '#92400e' },
 };
 
 const MEAL_PLANS: Record<string, string> = {
@@ -100,17 +102,17 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ReservationDetailPage() {
-  const { id }  = useParams<{ id: string }>();
-  const router  = useRouter();
-  const qc      = useQueryClient();
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const qc = useQueryClient();
 
   // Modal states
-  const [showCheckin,   setShowCheckin]   = useState(false);
-  const [showCheckout,  setShowCheckout]  = useState(false);
-  const [showCancel,    setShowCancel]    = useState(false);
-  const [showEdit,      setShowEdit]      = useState(false);
-  const [cancelReason,  setCancelReason]  = useState('');
-  const [editForm,      setEditForm]      = useState<any>(null);
+  const [showCheckin, setShowCheckin] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [editForm, setEditForm] = useState<any>(null);
 
   // Chat link state (returned from checkin)
   const [chatLink, setChatLink] = useState<string | null>(null);
@@ -123,49 +125,58 @@ export default function ReservationDetailPage() {
   const refresh = () => qc.invalidateQueries({ queryKey: ['reservation', id] });
 
   const checkinMutation = useMutation({
-  mutationFn: () => api.post(`/api/reservations/${id}/checkin`),
-  onSuccess: (data) => {
-    const link = data.data.data?.chatLink;
-    if (link) setChatLink(link);
-    toast.success('Guest checked in!');
-    refresh();
-    setShowCheckin(false);
+    mutationFn: () => api.post(`/api/reservations/${id}/checkin`),
+    onSuccess: (data) => {
+      const link = data.data.data?.chatLink;
+      if (link) setChatLink(link);
+      toast.success('Guest checked in!');
+      refresh();
+      setShowCheckin(false);
 
-    // ✅ FIX 1: was `res?.guestId?.firstName` — welcome message used wrong field
-    // "Welcome to ${res?.guestId?.firstName}" → should be hotel name, not guest name
-    // ✅ FIX 2: phone number must be digits only — strip spaces/dashes for wa.me
-    // ✅ FIX 3: WhatsApp block should use `link` not stale `chatLink` state
-    if (
-      res?.guestId?.whatsappOptIn &&
-      (res?.guestId?.whatsappNumber || res?.guestId?.phone) &&
-      link
-    ) {
-      const hotelName = res?.tenantId?.hotelName ?? 'our hotel';
-      const guestName = `${res?.guestId?.firstName ?? 'Guest'} ${res?.guestId?.lastName ?? ''}`.trim();
-      const rawPhone  = (res?.guestId?.whatsappNumber || res?.guestId?.phone) as string;
-      const phone     = rawPhone.replace(/\D/g, '');   // strip non-digits for wa.me
+      // ✅ FIX 1: was `res?.guestId?.firstName` — welcome message used wrong field
+      // "Welcome to ${res?.guestId?.firstName}" → should be hotel name, not guest name
+      // ✅ FIX 2: phone number must be digits only — strip spaces/dashes for wa.me
+      // ✅ FIX 3: WhatsApp block should use `link` not stale `chatLink` state
+      if (
+        res?.guestId?.whatsappOptIn &&
+        (res?.guestId?.whatsappNumber || res?.guestId?.phone) &&
+        link
+      ) {
+        const hotelName = res?.tenantId?.hotelName ?? 'our hotel';
+        const guestName = `${res?.guestId?.firstName ?? 'Guest'} ${res?.guestId?.lastName ?? ''}`.trim();
+        const rawPhone = (res?.guestId?.whatsappNumber || res?.guestId?.phone) as string;
+        const phone = rawPhone.replace(/\D/g, '');
 
-      const msg = [
-        `🏨 *Welcome to ${hotelName}, ${guestName}!*`,
-        ``,
-        `You're now checked in to Room *${res?.roomNumber}*.`,
-        ``,
-        `💬 Chat with us anytime:`,
-        link,                                           // ✅ FIX 3: uses fresh `link` not state
-        ``,
-        `Enjoy your stay! 🌟`,
-      ].join('\n');
+        const HOTEL = '\u{1F3E8}';
+        const CHAT = '\u{1F4AC}';
+        const STAR = '\u{1F31F}';
 
-      openWhatsApp(phone, msg);
-    }
-  },
-  onError: (e: any) =>
-    toast.error(e.response?.data?.message || 'Check-in failed'),
-});
+        const msg = [
+          `${HOTEL} *Welcome to ${hotelName}, ${guestName}!*`,
+          ``,
+          `You're now checked in to Room *${res?.roomNumber}*.`,
+          ``,
+          `${CHAT} Chat with us anytime:`,
+          link,
+          ``,
+          `Enjoy your stay! ${STAR}`,
+        ].join('\n');
 
+        openWhatsApp(phone, msg);
+      }
+    },
+    onError: (e: any) =>
+      toast.error(e.response?.data?.message || 'Check-in failed'),
+  });
   const checkoutMutation = useMutation({
     mutationFn: () => api.post(`/api/reservations/${id}/checkout`),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['reservations'] }),
+        qc.invalidateQueries({ queryKey: ['in-house'] }),
+        qc.invalidateQueries({ queryKey: ['departures-today'] }),
+        qc.invalidateQueries({ queryKey: ['arrivals-today'] }),
+      ]);
       const pts = data.data.data?.pointsEarned;
       toast.success(`Checkout complete! ${pts ? `+${pts} loyalty pts earned` : ''}`);
       refresh();
@@ -197,12 +208,12 @@ export default function ReservationDetailPage() {
   function openEdit() {
     setEditForm({
       specialRequests: res.specialRequests || '',
-      mealPlan:        res.mealPlan || 'room_only',
-      adults:          res.adults || 1,
-      children:        res.children || 0,
-      internalNotes:   res.internalNotes || '',
-      earlyCheckin:    res.earlyCheckin || false,
-      lateCheckout:    res.lateCheckout || false,
+      mealPlan: res.mealPlan || 'room_only',
+      adults: res.adults || 1,
+      children: res.children || 0,
+      internalNotes: res.internalNotes || '',
+      earlyCheckin: res.earlyCheckin || false,
+      lateCheckout: res.lateCheckout || false,
     });
     setShowEdit(true);
   }
@@ -226,15 +237,15 @@ export default function ReservationDetailPage() {
     </DashboardLayout>
   );
 
-  const guest   = res.guestId as any;
-  const room    = res.roomId  as any;
-  const status  = res.status;
-  const sMeta   = STATUS_META[status] || STATUS_META.inquiry;
+  const guest = res.guestId as any;
+  const room = res.roomId as any;
+  const status = res.status;
+  const sMeta = STATUS_META[status] || STATUS_META.inquiry;
 
-  const canCheckin  = status === 'confirmed';
+  const canCheckin = status === 'confirmed';
   const canCheckout = status === 'checked_in';
-  const canCancel   = !['checked_in', 'checked_out', 'cancelled'].includes(status);
-  const canEdit     = !['checked_out', 'cancelled'].includes(status);
+  const canCancel = !['checked_in', 'checked_out', 'cancelled'].includes(status);
+  const canEdit = !['checked_out', 'cancelled'].includes(status);
 
   const initials = `${guest?.firstName?.[0] || ''}${guest?.lastName?.[0] || ''}`;
 
@@ -297,17 +308,42 @@ export default function ReservationDetailPage() {
                 <Download className="w-3.5 h-3.5" /> C-Form
               </button>
 
-              {guest?.phone && (
-                <button
-                  onClick={() => openWhatsApp(guest.whatsappNumber || guest.phone, `Hi ${guest.firstName}, regarding your booking ${res.bookingRef} — `)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:bg-white/30"
-                  style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}>
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                  </svg>
-                  WhatsApp
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {guest?.phone && (
+                  <button
+                    onClick={() =>
+                      openWhatsApp(
+                        guest.whatsappNumber || guest.phone,
+                        `Hi ${guest.firstName}, regarding your booking ${res.bookingRef} — `
+                      )
+                    }
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:bg-white/30"
+                    style={{
+                      background: 'rgba(255,255,255,0.2)',
+                      backdropFilter: 'blur(8px)',
+                    }}
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    WhatsApp
+                  </button>
+                )}
+
+                {(chatLink || res?.chatLink) && (
+                  <a
+                    href={chatLink || res?.chatLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:bg-white/30"
+                    style={{
+                      background: 'rgba(255,255,255,0.2)',
+                      backdropFilter: 'blur(8px)',
+                    }}
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" />
+                    Chat Link
+                  </a>
+                )}
+              </div>
 
               {canCancel && (
                 <button onClick={() => setShowCancel(true)}
@@ -443,8 +479,8 @@ export default function ReservationDetailPage() {
                 </div>
 
                 <div className="space-y-2.5">
-                  <InfoRow icon={<Phone className="w-3.5 h-3.5" />}   label="Phone"  value={guest?.phone} />
-                  <InfoRow icon={<Mail  className="w-3.5 h-3.5" />}   label="Email"  value={guest?.email} />
+                  <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Phone" value={guest?.phone} />
+                  <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label="Email" value={guest?.email} />
                 </div>
 
                 {/* ID Status */}
@@ -491,13 +527,13 @@ export default function ReservationDetailPage() {
               </div>
 
               <div className="p-5 space-y-2.5">
-                <InfoRow icon={<Bed        className="w-3.5 h-3.5" />} label="Type"      value={room?.type} />
-                <InfoRow icon={<Sparkles   className="w-3.5 h-3.5" />} label="View"      value={room?.view} />
-                <InfoRow icon={<CreditCard className="w-3.5 h-3.5" />} label="Bed Type"  value={room?.bedType} />
-                <InfoRow icon={<Calendar   className="w-3.5 h-3.5" />} label="Check-in"  value={formatDate(res.checkIn)} />
-                <InfoRow icon={<Calendar   className="w-3.5 h-3.5" />} label="Check-out" value={formatDate(res.checkOut)} />
-                <InfoRow icon={<Clock      className="w-3.5 h-3.5" />} label="Nights"    value={`${res.nights} night${res.nights !== 1 ? 's' : ''}`} />
-                <InfoRow icon={<User       className="w-3.5 h-3.5" />} label="Guests"    value={`${res.adults} adults${res.children ? `, ${res.children} children` : ''}`} />
+                <InfoRow icon={<Bed className="w-3.5 h-3.5" />} label="Type" value={room?.type} />
+                <InfoRow icon={<Sparkles className="w-3.5 h-3.5" />} label="View" value={room?.view} />
+                <InfoRow icon={<CreditCard className="w-3.5 h-3.5" />} label="Bed Type" value={room?.bedType} />
+                <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label="Check-in" value={formatDate(res.checkIn)} />
+                <InfoRow icon={<Calendar className="w-3.5 h-3.5" />} label="Check-out" value={formatDate(res.checkOut)} />
+                <InfoRow icon={<Clock className="w-3.5 h-3.5" />} label="Nights" value={`${res.nights} night${res.nights !== 1 ? 's' : ''}`} />
+                <InfoRow icon={<User className="w-3.5 h-3.5" />} label="Guests" value={`${res.adults} adults${res.children ? `, ${res.children} children` : ''}`} />
               </div>
             </div>
           </div>
@@ -518,10 +554,10 @@ export default function ReservationDetailPage() {
 
               <div className="p-5 space-y-3">
                 {[
-                  { label: 'Rate per Night',   value: formatCurrency(res.ratePerNight),    mono: false },
-                  { label: 'Nights',           value: res.nights,                          mono: false },
-                  { label: 'Room Charges',     value: formatCurrency(res.totalRoomCharge), mono: false },
-                  { label: 'GST / Tax',        value: formatCurrency(res.totalTaxAmount),  mono: false },
+                  { label: 'Rate per Night', value: formatCurrency(res.ratePerNight), mono: false },
+                  { label: 'Nights', value: res.nights, mono: false },
+                  { label: 'Room Charges', value: formatCurrency(res.totalRoomCharge), mono: false },
+                  { label: 'GST / Tax', value: formatCurrency(res.totalTaxAmount), mono: false },
                 ].map(row => (
                   <div key={row.label} className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">{row.label}</span>
@@ -606,9 +642,9 @@ export default function ReservationDetailPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: 'Early Check-in',  value: res.earlyCheckin  ? '✅ Requested' : 'Not requested' },
-                    { label: 'Late Checkout',   value: res.lateCheckout  ? '✅ Requested' : 'Not requested' },
-                    { label: 'Actual Check-in', value: res.actualCheckIn  ? formatDate(res.actualCheckIn)  : '—' },
+                    { label: 'Early Check-in', value: res.earlyCheckin ? '✅ Requested' : 'Not requested' },
+                    { label: 'Late Checkout', value: res.lateCheckout ? '✅ Requested' : 'Not requested' },
+                    { label: 'Actual Check-in', value: res.actualCheckIn ? formatDate(res.actualCheckIn) : '—' },
                     { label: 'Actual Checkout', value: res.actualCheckOut ? formatDate(res.actualCheckOut) : '—' },
                   ].map(item => (
                     <div key={item.label} className="rounded-xl p-3" style={{ background: '#f9fafb' }}>
@@ -651,12 +687,12 @@ export default function ReservationDetailPage() {
           <div className="p-6 space-y-4">
             <div className="rounded-xl p-4 space-y-2" style={{ background: '#ecfdf5', border: '1px solid #bbf7d0' }}>
               {[
-                { label: 'Guest',       value: `${guest?.firstName} ${guest?.lastName}` },
-                { label: 'Room',        value: res.roomNumber },
-                { label: 'Check-in',    value: formatDate(res.checkIn) },
-                { label: 'Check-out',   value: formatDate(res.checkOut) },
-                { label: 'Nights',      value: res.nights },
-                { label: 'Total',       value: formatCurrency(res.totalAmount) },
+                { label: 'Guest', value: `${guest?.firstName} ${guest?.lastName}` },
+                { label: 'Room', value: res.roomNumber },
+                { label: 'Check-in', value: formatDate(res.checkIn) },
+                { label: 'Check-out', value: formatDate(res.checkOut) },
+                { label: 'Nights', value: res.nights },
+                { label: 'Total', value: formatCurrency(res.totalAmount) },
               ].map(r => (
                 <div key={r.label} className="flex justify-between text-sm">
                   <span className="text-green-700">{r.label}</span>
@@ -704,11 +740,11 @@ export default function ReservationDetailPage() {
           <div className="p-6 space-y-4">
             <div className="rounded-xl p-4 space-y-2" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
               {[
-                { label: 'Guest',         value: `${guest?.firstName} ${guest?.lastName}` },
+                { label: 'Guest', value: `${guest?.firstName} ${guest?.lastName}` },
                 { label: 'Room Released', value: res.roomNumber },
-                { label: 'Total Amount',  value: formatCurrency(res.totalAmount) },
-                { label: 'Advance Paid',  value: formatCurrency(res.advancePaid || 0) },
-                { label: 'Balance Due',   value: formatCurrency(res.balanceDue  || 0) },
+                { label: 'Total Amount', value: formatCurrency(res.totalAmount) },
+                { label: 'Advance Paid', value: formatCurrency(res.advancePaid || 0) },
+                { label: 'Balance Due', value: formatCurrency(res.balanceDue || 0) },
               ].map(r => (
                 <div key={r.label} className="flex justify-between text-sm">
                   <span className="text-blue-700">{r.label}</span>
@@ -789,91 +825,91 @@ export default function ReservationDetailPage() {
       )}
 
       {/* Edit Modal */}
-   {showEdit && editForm && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-    style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-    <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden">
-      <ModalHeader
-        title="Edit Reservation"
-        subtitle={res.bookingRef}
-        icon={<Edit2 className="w-4 h-4" />}
-        gradient="linear-gradient(135deg,#F97316,#F43F5E)"
-        onClose={() => setShowEdit(false)}
-      />
-      <form
-        className="p-6 space-y-4 max-h-[70vh] overflow-y-auto"
-        onSubmit={e => { e.preventDefault(); updateMutation.mutate(editForm); }}
-      >
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Adults" required>
-            <input type="number" min={1} className={inp} value={editForm.adults}
-              onChange={e => setEditForm((p: any) => ({ ...p, adults: +e.target.value }))} />
-          </Field>
-          <Field label="Children">
-            <input type="number" min={0} className={inp} value={editForm.children}
-              onChange={e => setEditForm((p: any) => ({ ...p, children: +e.target.value }))} />
-          </Field>
+      {showEdit && editForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <ModalHeader
+              title="Edit Reservation"
+              subtitle={res.bookingRef}
+              icon={<Edit2 className="w-4 h-4" />}
+              gradient="linear-gradient(135deg,#F97316,#F43F5E)"
+              onClose={() => setShowEdit(false)}
+            />
+            <form
+              className="p-6 space-y-4 max-h-[70vh] overflow-y-auto"
+              onSubmit={e => { e.preventDefault(); updateMutation.mutate(editForm); }}
+            >
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Adults" required>
+                  <input type="number" min={1} className={inp} value={editForm.adults}
+                    onChange={e => setEditForm((p: any) => ({ ...p, adults: +e.target.value }))} />
+                </Field>
+                <Field label="Children">
+                  <input type="number" min={0} className={inp} value={editForm.children}
+                    onChange={e => setEditForm((p: any) => ({ ...p, children: +e.target.value }))} />
+                </Field>
+              </div>
+
+              <Field label="Meal Plan">
+                <select className={inp} value={editForm.mealPlan}
+                  onChange={e => setEditForm((p: any) => ({ ...p, mealPlan: e.target.value }))}>
+                  {Object.entries(MEAL_PLANS).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Special Requests">
+                <textarea className={`${inp} resize-none`} rows={3} value={editForm.specialRequests}
+                  onChange={e => setEditForm((p: any) => ({ ...p, specialRequests: e.target.value }))}
+                  placeholder="Any special requests..." />
+              </Field>
+
+              <Field label="Internal Notes (staff only)">
+                <textarea className={`${inp} resize-none`} rows={2} value={editForm.internalNotes}
+                  onChange={e => setEditForm((p: any) => ({ ...p, internalNotes: e.target.value }))} />
+              </Field>
+
+              <div className="flex gap-3">
+                {[
+                  { key: 'earlyCheckin', label: '⏰ Early Check-in' },
+                  { key: 'lateCheckout', label: '🌙 Late Checkout' },
+                ].map(opt => (
+                  <div key={opt.key}
+                    onClick={() => setEditForm((p: any) => ({ ...p, [opt.key]: !p[opt.key] }))}
+                    className="flex flex-1 items-center gap-2 cursor-pointer rounded-xl border px-3.5 py-2.5 transition-all"
+                    style={{
+                      background: editForm[opt.key] ? '#f5f3ff' : '#f9fafb',
+                      borderColor: editForm[opt.key] ? '#ddd6fe' : '#e5e7eb',
+                    }}>
+                    <input type="checkbox" checked={editForm[opt.key]} onChange={() => { }}
+                      className="w-4 h-4 accent-violet-500" />
+                    <label className="text-xs font-semibold cursor-pointer"
+                      style={{ color: editForm[opt.key] ? '#5b21b6' : '#374151' }}>
+                      {opt.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => setShowEdit(false)}
+                  className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all">
+                  Cancel
+                </button>
+                <button type="submit" disabled={updateMutation.isPending}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg,#F97316,#F43F5E)', boxShadow: '0 4px 14px rgba(249,115,22,0.35)' }}>
+                  {updateMutation.isPending
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                    : <><Check className="w-4 h-4" /> Save Changes</>}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-
-        <Field label="Meal Plan">
-          <select className={inp} value={editForm.mealPlan}
-            onChange={e => setEditForm((p: any) => ({ ...p, mealPlan: e.target.value }))}>
-            {Object.entries(MEAL_PLANS).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Special Requests">
-          <textarea className={`${inp} resize-none`} rows={3} value={editForm.specialRequests}
-            onChange={e => setEditForm((p: any) => ({ ...p, specialRequests: e.target.value }))}
-            placeholder="Any special requests..." />
-        </Field>
-
-        <Field label="Internal Notes (staff only)">
-          <textarea className={`${inp} resize-none`} rows={2} value={editForm.internalNotes}
-            onChange={e => setEditForm((p: any) => ({ ...p, internalNotes: e.target.value }))} />
-        </Field>
-
-        <div className="flex gap-3">
-          {[
-            { key: 'earlyCheckin', label: '⏰ Early Check-in' },
-            { key: 'lateCheckout', label: '🌙 Late Checkout' },
-          ].map(opt => (
-            <div key={opt.key}
-              onClick={() => setEditForm((p: any) => ({ ...p, [opt.key]: !p[opt.key] }))}
-              className="flex flex-1 items-center gap-2 cursor-pointer rounded-xl border px-3.5 py-2.5 transition-all"
-              style={{
-                background:  editForm[opt.key] ? '#f5f3ff' : '#f9fafb',
-                borderColor: editForm[opt.key] ? '#ddd6fe' : '#e5e7eb',
-              }}>
-              <input type="checkbox" checked={editForm[opt.key]} onChange={() => {}}
-                className="w-4 h-4 accent-violet-500" />
-              <label className="text-xs font-semibold cursor-pointer"
-                style={{ color: editForm[opt.key] ? '#5b21b6' : '#374151' }}>
-                {opt.label}
-              </label>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-3 justify-end pt-2">
-          <button type="button" onClick={() => setShowEdit(false)}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all">
-            Cancel
-          </button>
-          <button type="submit" disabled={updateMutation.isPending}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-60"
-            style={{ background: 'linear-gradient(135deg,#F97316,#F43F5E)', boxShadow: '0 4px 14px rgba(249,115,22,0.35)' }}>
-            {updateMutation.isPending
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
-              : <><Check className="w-4 h-4" /> Save Changes</>}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
+      )}
     </DashboardLayout>
   );
 }

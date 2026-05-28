@@ -48,11 +48,20 @@ import {
   Activity,
   UserCircle2,
   Sparkles,
+  Eye,
+  RefreshCw,
+  Loader2,
+  FileDown,
+  Phone,
+  Calendar,
+  ChevronRight,
+  Search,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { SectionTitle } from '@/components/components/ui/card';
 
 interface Charge {
   id: string;
@@ -163,15 +172,6 @@ const PAYMENT_MODE_LABELS: Record<string, string> = {
   wallet: 'Wallet',
 };
 
-function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div>
-      <h3 className="text-sm font-bold tracking-wide text-slate-900">{title}</h3>
-      {subtitle ? <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p> : null}
-    </div>
-  );
-}
-
 function ActionCard({
   icon,
   title,
@@ -222,10 +222,10 @@ function FolioListPanel({
   const [search, setSearch] = useState('');
   const [listType, setListType] = useState<'open' | 'unsettled'>('open');
 
- const { data, isLoading } = useQuery({
-  queryKey: ['folios-list', listType],
-  queryFn: () => api.get(`/api/folios/${listType}`).then((r) => r.data.data),
-});
+  const { data, isLoading } = useQuery({
+    queryKey: ['folios-list', listType],
+    queryFn: () => api.get(`/api/folios/${listType}`).then((r) => r.data.data),
+  });
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase().trim();
@@ -233,115 +233,276 @@ function FolioListPanel({
     if (!term) return rows;
 
     return rows.filter((f: any) => {
-      const guest = `${f.guestId?.firstName || ''} ${f.guestId?.lastName || ''}`.toLowerCase();
+      const guest =
+        `${f.guestId?.firstName || ''} ${f.guestId?.lastName || ''}`.toLowerCase();
       const room = String(f.reservationId?.roomNumber || '').toLowerCase();
       const ref = String(f.reservationId?.bookingRef || '').toLowerCase();
       const folioNo = String(f.folioNumber || '').toLowerCase();
+      const phone = String(f.guestId?.phone || '').toLowerCase();
+
       return (
         guest.includes(term) ||
         room.includes(term) ||
         ref.includes(term) ||
-        folioNo.includes(term)
+        folioNo.includes(term) ||
+        phone.includes(term)
       );
     });
   }, [data, search]);
 
+  const totalDue = useMemo(
+    () =>
+      (filtered || []).reduce(
+        (sum: number, f: any) => sum + Number(f?.balance || 0),
+        0
+      ),
+    [filtered]
+  );
+
   return (
     <Card className="overflow-hidden border-white/60 bg-white/85 shadow-xl backdrop-blur">
-      <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50">
-        <div className="flex items-center justify-between gap-3">
-          <SectionTitle title="Folio Queue" subtitle="Open and unsettled folios" />
-          <Badge variant="info">{filtered?.length || 0}</Badge>
+      <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50 p-0">
+        <div className="relative overflow-hidden px-5 py-5">
+          <div
+            className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-20"
+            style={{ background: 'rgba(249,115,22,0.25)' }}
+          />
+          <div
+            className="pointer-events-none absolute -bottom-6 left-10 h-20 w-20 rounded-full opacity-20"
+            style={{ background: 'rgba(236,72,153,0.22)' }}
+          />
+
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg"
+                style={{
+                  background: 'linear-gradient(135deg,#F97316,#F43F5E)',
+                  boxShadow: '0 10px 24px rgba(249,115,22,0.28)',
+                }}
+              >
+                <Receipt className="h-5 w-5" />
+              </div>
+
+              <div>
+                <p className="text-lg font-bold text-slate-900">Folio Queue</p>
+                <p className="text-xs text-slate-600">
+                  Open balances and unsettled guest folios
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-white/70">
+                {(filtered || []).length} folios
+              </span>
+            </div>
+          </div>
         </div>
       </CardHeader>
 
-      <div className="space-y-3 p-4">
+      <div className="space-y-4 p-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              View
+            </p>
+            <p className="mt-1 text-sm font-bold text-slate-900 capitalize">
+              {listType}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-500">
+              Queue Due
+            </p>
+            <p className="mt-1 text-sm font-bold text-rose-700">
+              {formatCurrency(totalDue)}
+            </p>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
           <button
             type="button"
             onClick={() => setListType('open')}
             className={cn(
-              'rounded-xl px-3 py-2 text-sm font-semibold transition',
-              listType === 'open' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              'rounded-xl px-3 py-2.5 text-sm font-bold transition-all',
+              listType === 'open'
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-orange-200'
+                : 'text-slate-500 hover:text-slate-700'
             )}
           >
-            Open
+            Open Folios
           </button>
+
           <button
             type="button"
             onClick={() => setListType('unsettled')}
             className={cn(
-              'rounded-xl px-3 py-2 text-sm font-semibold transition',
-              listType === 'unsettled' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              'rounded-xl px-3 py-2.5 text-sm font-bold transition-all',
+              listType === 'unsettled'
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-orange-200'
+                : 'text-slate-500 hover:text-slate-700'
             )}
           >
             Unsettled
           </button>
         </div>
 
-        <Input
-          placeholder="Search folio, guest, room..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            className="pl-10"
+            placeholder="Search guest, folio, booking, room, phone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
 
         {isLoading ? (
           <div className="flex justify-center py-10">
             <Spinner />
           </div>
         ) : !filtered?.length ? (
-          <EmptyState title="No folios found" description="Try another filter or search term." />
+          <EmptyState
+            title="No folios found"
+            description="Try another filter or search term."
+          />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="space-y-3">
             {filtered.map((f: any) => {
-  const folioId = String(f?._id || f?.id || '');
-  const guestName =
-    `${f.guestId?.firstName || ''} ${f.guestId?.lastName || ''}`.trim() || 'Guest';
-  const selected = selectedFolioId === folioId;
+              const folioId = String(f?._id || f?.id || '');
+              const guestName =
+                `${f.guestId?.firstName || ''} ${f.guestId?.lastName || ''}`.trim() ||
+                'Guest';
+              const selected = selectedFolioId === folioId;
+              const phone = f.guestId?.phone || '';
+              const room = f.reservationId?.roomNumber || '-';
+              const bookingRef = f.reservationId?.bookingRef || '-';
+              const checkIn = f.reservationId?.checkIn
+                ? formatDate(f.reservationId.checkIn)
+                : null;
+              const checkOut = f.reservationId?.checkOut
+                ? formatDate(f.reservationId.checkOut)
+                : null;
 
-  return (
-    <button
-      key={folioId}
-      onClick={() => {
-        console.log('selected folio:', folioId, f);
-        onSelect(folioId);
-      }}
-      className={cn(
-        'w-full px-4 py-4 text-left transition hover:bg-orange-50/60',
-        selected && 'bg-gradient-to-r from-orange-50 to-pink-50 ring-1 ring-orange-200'
-      )}
-      type="button"
-    >
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-pink-500 text-sm font-bold text-white shadow">
-          {guestName?.[0] || 'G'}
-        </div>
+              return (
+                <button
+                  key={folioId}
+                  type="button"
+                  onClick={() => onSelect(folioId)}
+                  className={cn(
+                    'group w-full rounded-2xl border px-4 py-4 text-left shadow-sm transition-all',
+                    selected
+                      ? 'border-orange-200 bg-gradient-to-r from-orange-50 via-rose-50 to-white ring-1 ring-orange-200 shadow-md'
+                      : 'border-slate-100 bg-white hover:border-orange-100 hover:bg-orange-50/40 hover:shadow-md'
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow"
+                      style={{
+                        background: selected
+                          ? 'linear-gradient(135deg,#F97316,#F43F5E)'
+                          : 'linear-gradient(135deg,#fb923c,#f472b6)',
+                      }}
+                    >
+                      {guestName?.[0] || 'G'}
+                    </div>
 
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-900">{guestName}</p>
-          <p className="text-xs text-slate-500">
-            Folio {f.folioNumber} · Room {f.reservationId?.roomNumber || '-'} ·{' '}
-            {f.reservationId?.bookingRef || '-'}
-          </p>
-        </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="truncate text-sm font-bold text-slate-900">
+                              {guestName}
+                            </p>
 
-        <div className="text-right">
-          <p
-            className={cn(
-              'text-sm font-bold',
-              f.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
-            )}
-          >
-            {formatCurrency(f.balance || 0)}
-          </p>
-          <p className="text-[11px] text-slate-400">
-            {f.isSettled ? 'Settled' : 'Due'}
-          </p>
-        </div>
-      </div>
-    </button>
-  );
-})}
+                            <span
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-[11px] font-bold',
+                                f.isSettled
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-amber-50 text-amber-700'
+                              )}
+                            >
+                              {f.isSettled ? 'Settled' : 'Due'}
+                            </span>
+                          </div>
+
+                          <p className="mt-1 font-mono text-[11px] text-slate-500">
+                            {f.folioNumber || '-'}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <p
+                            className={cn(
+                              'text-sm font-bold',
+                              Number(f.balance || 0) > 0
+                                ? 'text-rose-600'
+                                : 'text-emerald-600'
+                            )}
+                          >
+                            {formatCurrency(f.balance || 0)}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {Number(f.balance || 0) > 0 ? 'Outstanding' : 'Cleared'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="rounded-xl bg-slate-50 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                            Booking
+                          </p>
+                          <p className="mt-0.5 text-xs font-medium text-slate-700">
+                            {bookingRef}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-slate-50 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                            Room
+                          </p>
+                          <p className="mt-0.5 text-xs font-medium text-slate-700">
+                            Room {room}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                        {phone ? (
+                          <span className="flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5 text-slate-400" />
+                            {phone}
+                          </span>
+                        ) : null}
+
+                        {checkIn ? (
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                            {checkIn}
+                            {checkOut ? ` → ${checkOut}` : ''}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <ChevronRight
+                      className={cn(
+                        'mt-1 h-4 w-4 flex-shrink-0 transition-all',
+                        selected
+                          ? 'text-orange-500'
+                          : 'text-slate-300 group-hover:text-orange-400'
+                      )}
+                    />
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -351,56 +512,52 @@ function FolioListPanel({
 
 function ReconciliationPanel() {
   const today = new Date().toISOString().slice(0, 10);
-
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  const [date, setDate] = useState(today);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['folio-reconciliation', startDate, endDate],
+    queryKey: ['folio-reconciliation', date],
     queryFn: () =>
       api
         .get('/api/folios/reconciliation/daily', {
-          params: { startDate, endDate },
+          params: { date },
         })
         .then((r) => r.data.data),
   });
 
   return (
-    <Card className="border-white/60 bg-white/85 shadow-xl backdrop-blur">
-      <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SectionTitle
-            title="Daily Reconciliation"
-            subtitle="Finance and cashier summary"
-          />
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="w-44">
-              <Input
-                label="From"
-                type="date"
-                value={startDate}
-                max={endDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-
-            <div className="w-44">
-              <Input
-                label="To"
-                type="date"
-                value={endDate}
-                min={startDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-50 px-5 py-4"
+        style={{ background: '#fafafa' }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
+            style={{ background: 'linear-gradient(135deg,#fff7ed,#fff1f2)' }}
+          >
+            <CalendarDays className="h-4 w-4 text-orange-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-900">Daily Reconciliation</p>
+            <p className="text-xs text-gray-500">
+              Cashier and finance summary for the selected business date
+            </p>
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-4">
+        <div className="w-48">
+          <Input
+            label="Business Date"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-5 p-5">
         {isLoading ? (
-          <div className="flex justify-center py-8">
+          <div className="flex justify-center py-10">
             <Spinner />
           </div>
         ) : !data ? (
@@ -408,25 +565,34 @@ function ReconciliationPanel() {
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">Total Charges</p>
-                <p className="mt-1 text-xl font-bold text-slate-900">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Total Charges
+                </p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">
                   {formatCurrency(data.totals?.totalCharges || 0)}
                 </p>
+                <p className="text-xs text-slate-400">All charge lines posted</p>
               </div>
 
-              <div className="rounded-2xl bg-emerald-50 p-4">
-                <p className="text-xs text-emerald-600">Total Payments</p>
-                <p className="mt-1 text-xl font-bold text-emerald-700">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
+                  Total Payments
+                </p>
+                <p className="mt-2 text-2xl font-bold text-emerald-700">
                   {formatCurrency(data.totals?.totalPayments || 0)}
                 </p>
+                <p className="text-xs text-emerald-500">Collected across all payment modes</p>
               </div>
 
-              <div className="rounded-2xl bg-rose-50 p-4">
-                <p className="text-xs text-rose-600">Outstanding</p>
-                <p className="mt-1 text-xl font-bold text-rose-700">
+              <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">
+                  Outstanding
+                </p>
+                <p className="mt-2 text-2xl font-bold text-rose-700">
                   {formatCurrency(data.totals?.totalBalance || 0)}
                 </p>
+                <p className="text-xs text-rose-500">Still pending at folio level</p>
               </div>
             </div>
 
@@ -436,31 +602,72 @@ function ReconciliationPanel() {
                   <tr>
                     <Th>Folio</Th>
                     <Th>Guest</Th>
+                    <Th>Booking</Th>
+                    <Th>Room</Th>
                     <Th>Charges</Th>
                     <Th>Payments</Th>
                     <Th>Balance</Th>
+                    <Th>Invoice</Th>
                     <Th>Status</Th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {data.rows?.map((row: any, index: number) => {
-                    const rowKey = String(row?.folioId || row?.folioNumber || `recon-${index}`);
+                    const rowKey = String(
+                      row?.folioId || row?.folioNumber || `recon-${index}`
+                    );
 
                     return (
                       <Tr key={rowKey}>
-                        <Td className="font-mono text-xs">{row.folioNumber}</Td>
-                        <Td className="text-sm">{row.guestName}</Td>
-                        <Td>{formatCurrency(row.totalCharges)}</Td>
-                        <Td>{formatCurrency(row.totalPayments)}</Td>
+                        <Td>
+                          <div className="space-y-1">
+                            <p className="font-mono text-xs font-semibold text-slate-700">
+                              {row.folioNumber || '-'}
+                            </p>
+                            <p className="text-[11px] text-slate-400">{row.folioId || '-'}</p>
+                          </div>
+                        </Td>
+
+                        <Td className="text-sm font-medium text-slate-800">
+                          {row.guestName || '-'}
+                        </Td>
+
+                        <Td className="text-xs text-slate-500">
+                          {row.bookingRef || '-'}
+                        </Td>
+
+                        <Td className="text-sm text-slate-700">
+                          {row.roomNumber || '-'}
+                        </Td>
+
+                        <Td className="font-medium text-slate-900">
+                          {formatCurrency(row.totalCharges || 0)}
+                        </Td>
+
+                        <Td className="font-medium text-emerald-700">
+                          {formatCurrency(row.totalPayments || 0)}
+                        </Td>
+
                         <Td
                           className={cn(
                             'font-semibold',
                             row.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
                           )}
                         >
-                          {formatCurrency(row.balance)}
+                          {formatCurrency(row.balance || 0)}
                         </Td>
+
+                        <Td>
+                          {row.gstInvoiceNo ? (
+                            <span className="font-mono text-xs text-slate-600">
+                              {row.gstInvoiceNo}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-amber-600">Pending</span>
+                          )}
+                        </Td>
+
                         <Td>
                           {row.settled ? (
                             <Badge variant="success">Settled</Badge>
@@ -476,8 +683,8 @@ function ReconciliationPanel() {
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -679,9 +886,28 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
 
   const settleFolio = useMutation({
     mutationFn: (d: any) => api.post(`/api/folios/${folioId}/settle`, d),
-    onSuccess: () => {
+    onSuccess: async () => {
+      qc.setQueryData(['reservation', folio?.reservationId], (old: any) =>
+        !old
+          ? old
+          : {
+            ...old,
+            balanceDue: 0,
+            folioId: {
+              ...old.folioId,
+              balance: 0,
+              status: 'settled',
+            },
+          }
+      );
+
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['reservation', folio?.reservationId] }),
+        qc.invalidateQueries({ queryKey: ['reservations'] }),
+        qc.invalidateQueries({ queryKey: ['folio', folioId] }),
+      ]);
+
       toast.success('Folio settled');
-      invalidateAll();
       setShowSettleModal(false);
       setSettleForm({ mode: 'cash', reference: '', notes: '' });
     },
@@ -1124,7 +1350,7 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {folio.charges.map((c:any, i:number) => (
+                  {folio.charges.map((c: any, i: number) => (
                     <Tr key={i} className={c.isVoid ? 'opacity-40 line-through' : ''}>
                       <Td className="font-medium text-sm">
                         <div>{c.description}</div>
@@ -1523,8 +1749,8 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
               <div className="text-base font-bold text-slate-900">
                 {formatCurrency(
                   Number(chargeForm.amount || 0) *
-                    Number(chargeForm.quantity || 0) *
-                    (1 + Number(chargeForm.taxPct || 0) / 100)
+                  Number(chargeForm.quantity || 0) *
+                  (1 + Number(chargeForm.taxPct || 0) / 100)
                 )}
               </div>
             </div>
@@ -1760,101 +1986,162 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
   );
 }
 
+function downloadPdf(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+function PaymentMode({ label, value }: { label: string; value?: number }) {
+  if (!value) return <span className="text-xs text-slate-400">-</span>;
+  return (
+    <div className="text-[11px] text-slate-500">
+      {label}: <span className="font-medium text-slate-700">{formatCurrency(value)}</span>
+    </div>
+  );
+}
+
 function SettledGuestsTable() {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+ const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+    .toISOString()
+    .slice(0, 10);
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate, setEndDate] = useState(todayStr);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['folio-bottom-summary', date],
+    queryKey: ['folio-summary-range', startDate, endDate],
     queryFn: () =>
       api
-        .get('/api/folios/reconciliation/daily', { params: { date } })
+        .get('/api/folios/reconciliation/summary', {
+          params: { startDate, endDate },
+        })
         .then((r) => r.data.data),
   });
 
   return (
-    <Card className="border-white/60 bg-white/85 shadow-xl backdrop-blur">
+    <Card className="overflow-hidden border-white/60 bg-white/85 shadow-xl backdrop-blur">
       <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SectionTitle
             title="Guest Billing Summary"
-            subtitle="All billed guest folios for the selected date"
+            subtitle="Summary by selected date range"
           />
-          <div className="w-44">
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-44">
+              <Input
+                label="From"
+                type="date"
+                value={startDate}
+                max={endDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+
+            <div className="w-44">
+              <Input
+                label="To"
+                type="date"
+                value={endDate}
+                min={startDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-4">
+      <CardContent className="space-y-4 pt-4">
         {isLoading ? (
-          <div className="flex justify-center py-10">
+          <div className="flex justify-center py-8">
             <Spinner />
           </div>
-        ) : !data?.rows?.length ? (
-          <EmptyState
-            title="No billed guests found"
-            description="No folio billing records are available for the selected date."
-          />
+        ) : !data ? (
+          <EmptyState title="No summary data" />
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-slate-100">
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Folio</Th>
-                  <Th>Guest</Th>
-                  <Th>Booking</Th>
-                  <Th>Room</Th>
-                  <Th>Charges</Th>
-                  <Th>Payments</Th>
-                  <Th>Balance</Th>
-                  <Th>Invoice</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((row: any, index: number) => {
-                  const rowKey = String(row?.folioId || row?.folioNumber || `row-${index}`);
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs text-slate-500">Total Charges</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">
+                  {formatCurrency(data.totals?.totalCharges || 0)}
+                </p>
+              </div>
 
-                  return (
-                    <Tr key={rowKey}>
-                      <Td className="font-mono text-xs">{row.folioNumber || '-'}</Td>
-                      <Td className="text-sm font-medium text-slate-800">
-                        {row.guestName || '-'}
-                      </Td>
-                      <Td className="text-xs text-slate-500">{row.bookingRef || '-'}</Td>
-                      <Td className="text-sm">{row.roomNumber || '-'}</Td>
-                      <Td className="font-medium">{formatCurrency(row.totalCharges || 0)}</Td>
-                      <Td className="text-emerald-700 font-medium">
-                        {formatCurrency(row.totalPayments || 0)}
-                      </Td>
-                      <Td
-                        className={cn(
-                          'font-semibold',
-                          row.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
-                        )}
-                      >
-                        {formatCurrency(row.balance || 0)}
-                      </Td>
-                      <Td className="font-mono text-xs text-slate-500">
-                        {row.gstInvoiceNo || 'Not generated'}
-                      </Td>
-                      <Td>
-                        {row.settled ? (
-                          <Badge variant="success">Settled</Badge>
-                        ) : (
-                          <Badge variant="danger">Open</Badge>
-                        )}
-                      </Td>
-                    </Tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </div>
+              <div className="rounded-2xl bg-emerald-50 p-4">
+                <p className="text-xs text-emerald-600">Total Payments</p>
+                <p className="mt-1 text-xl font-bold text-emerald-700">
+                  {formatCurrency(data.totals?.totalPayments || 0)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-rose-50 p-4">
+                <p className="text-xs text-rose-600">Outstanding</p>
+                <p className="mt-1 text-xl font-bold text-rose-700">
+                  {formatCurrency(data.totals?.totalBalance || 0)}
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-slate-100">
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Folio</Th>
+                    <Th>Guest</Th>
+                    <Th>Booking</Th>
+                    <Th>Room</Th>
+                    <Th>Charges</Th>
+                    <Th>Payments</Th>
+                    <Th>Balance</Th>
+                    <Th>Status</Th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {data.rows?.map((row: any, index: number) => {
+                    const rowKey = String(row?.folioId || row?.folioNumber || `sum-${index}`);
+
+                    return (
+                      <Tr key={rowKey}>
+                        <Td className="font-mono text-xs">{row.folioNumber || '-'}</Td>
+                        <Td className="text-sm">{row.guestName || '-'}</Td>
+                        <Td className="text-xs text-slate-500">{row.bookingRef || '-'}</Td>
+                        <Td>{row.roomNumber || '-'}</Td>
+                        <Td>{formatCurrency(row.totalCharges || 0)}</Td>
+                        <Td className="text-emerald-700">
+                          {formatCurrency(row.totalPayments || 0)}
+                        </Td>
+                        <Td
+                          className={cn(
+                            'font-semibold',
+                            row.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
+                          )}
+                        >
+                          {formatCurrency(row.balance || 0)}
+                        </Td>
+                        <Td>
+                          {row.settled ? (
+                            <Badge variant="success">Settled</Badge>
+                          ) : (
+                            <Badge variant="danger">Open</Badge>
+                          )}
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
@@ -1863,100 +2150,300 @@ function SettledGuestsTable() {
 
 function BillingContent() {
   const searchParams = useSearchParams();
-  const [selectedFolioId, setSelectedFolioId] = useState<string | null>(searchParams.get('folioId'));
+  const [selectedFolioId, setSelectedFolioId] = useState<string | null>(
+    searchParams.get('folioId')
+  );
   const [showRecon, setShowRecon] = useState(false);
+  const qc = useQueryClient();
+
+  const refreshBilling = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['folios-list'] }),
+      qc.invalidateQueries({ queryKey: ['folio'] }),
+      qc.invalidateQueries({ queryKey: ['folio-summary'] }),
+      qc.invalidateQueries({ queryKey: ['folio-timeline'] }),
+      qc.invalidateQueries({ queryKey: ['folio-invoice-preview'] }),
+      qc.invalidateQueries({ queryKey: ['folio-reconciliation'] }),
+      qc.invalidateQueries({ queryKey: ['folio-bottom-summary'] }),
+    ]);
+  };
 
   return (
     <DashboardLayout title="Billing">
-      <div className="space-y-5">
-        <div className="overflow-hidden rounded-[28px] border border-white/60 bg-white/70 shadow-xl backdrop-blur">
-          <div className="bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.18),transparent_24%),radial-gradient(circle_at_top_right,rgba(236,72,153,0.18),transparent_24%),linear-gradient(135deg,#fff7ed,#fff1f2_45%,#ffffff)] p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="rounded-3xl bg-gradient-to-br from-orange-500 via-pink-500 to-rose-500 p-3 text-white shadow-lg">
-                  <Receipt className="h-6 w-6" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900">Billing Folios</h1>
-                  <p className="text-sm text-slate-600">
-                    Cashier console for charges, payments, settlement, GST invoices and reconciliation.
-                  </p>
-                </div>
+      <div className="space-y-5 max-w-7xl pb-10">
+        <div
+          className="relative overflow-hidden rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 text-white shadow-xl"
+          style={{ background: 'linear-gradient(135deg,#F97316 0%,#F43F5E 100%)' }}
+        >
+          <div
+            className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full opacity-20"
+            style={{ background: 'rgba(255,255,255,0.3)' }}
+          />
+          <div
+            className="pointer-events-none absolute -bottom-6 left-20 h-28 w-28 rounded-full opacity-10"
+            style={{ background: 'rgba(255,255,255,0.5)' }}
+          />
+
+          <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
+            <div className="relative flex-shrink-0">
+              <div
+                className="w-20 h-20 rounded-2xl flex items-center justify-center text-white shadow-lg"
+                style={{
+                  background: 'rgba(255,255,255,0.25)',
+                  backdropFilter: 'blur(8px)',
+                  border: '2px solid rgba(255,255,255,0.4)',
+                }}
+              >
+                <Receipt className="w-9 h-9" />
               </div>
 
+              <div
+                className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center"
+                style={{
+                  background: '#16a34a',
+                  boxShadow: '0 2px 8px rgba(22,163,74,0.45)',
+                }}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className="text-sm font-medium opacity-80">Cashier Console</span>
+                <span
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                  }}
+                >
+                  GST-ready
+                </span>
+              </div>
+
+              <h1 className="text-2xl font-bold leading-tight">Billing Folios</h1>
+
+              <div className="flex items-center gap-4 flex-wrap text-sm opacity-80 mt-2">
+                <span className="flex items-center gap-1.5">
+                  <IndianRupee className="w-3.5 h-3.5" />
+                  Charges and taxes
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5" />
+                  Payments and settlement
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5" />
+                  GST invoice workflow
+                </span>
+              </div>
+
+              <div
+                className="mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-1.5"
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="text-sm font-bold">
+                  Real-time folio posting, invoice generation, email and reconciliation
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 flex-wrap sm:flex-col sm:items-end">
               <Button
-                variant="secondary"
-                icon={<CalendarDays className="h-4 w-4" />}
+                variant="ghost"
+                className="!rounded-xl !border-0 !bg-white/20 !px-3 !py-2 !text-xs !font-semibold !text-white backdrop-blur hover:!bg-white/30"
+                icon={<RefreshCw className="h-3.5 w-3.5" />}
+                onClick={refreshBilling}
+              >
+                Refresh
+              </Button>
+
+              <Button
+                variant="ghost"
+                className="!rounded-xl !border-0 !bg-white/20 !px-3 !py-2 !text-xs !font-bold !text-white backdrop-blur hover:!bg-white/30"
+                icon={<CalendarDays className="h-3.5 w-3.5" />}
                 onClick={() => setShowRecon((s) => !s)}
               >
                 {showRecon ? 'Hide Reconciliation' : 'Show Reconciliation'}
               </Button>
             </div>
+          </div>
+        </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <div className="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-white/60">
-                <div className="flex items-center gap-2">
-                  <IndianRupee className="h-4 w-4 text-orange-500" />
-                  <p className="text-xs text-slate-500">Charges</p>
-                </div>
-                <p className="mt-2 text-xl font-bold text-slate-900">Real-time folio posting</p>
-              </div>
-              <div className="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-white/60">
-                <div className="flex items-center gap-2">
-                  <Wallet className="h-4 w-4 text-emerald-500" />
-                  <p className="text-xs text-slate-500">Payments</p>
-                </div>
-                <p className="mt-2 text-xl font-bold text-slate-900">Cash, card, UPI, direct billing</p>
-              </div>
-              <div className="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-white/60">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-pink-500" />
-                  <p className="text-xs text-slate-500">Invoices</p>
-                </div>
-                <p className="mt-2 text-xl font-bold text-slate-900">GST preview, download and email</p>
-              </div>
-              <div className="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-white/60">
-                <div className="flex items-center gap-2">
-                  <Clock3 className="h-4 w-4 text-amber-500" />
-                  <p className="text-xs text-slate-500">Settlement</p>
-                </div>
-                <p className="mt-2 text-xl font-bold text-slate-900">Validate, settle and close</p>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Charges
+              </span>
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-lg"
+                style={{ background: 'linear-gradient(135deg,#fff7ed,#fff1f2)' }}
+              >
+                <IndianRupee className="h-3.5 w-3.5 text-orange-500" />
               </div>
             </div>
+            <p className="mt-2 text-lg font-bold text-slate-900">Real-time posting</p>
+            <p className="text-xs text-slate-400">Room, F&B, tax, refunds and discounts</p>
+          </div>
+
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Payments
+              </span>
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-lg"
+                style={{ background: 'linear-gradient(135deg,#ecfdf5,#f0fdf4)' }}
+              >
+                <Wallet className="h-3.5 w-3.5 text-emerald-500" />
+              </div>
+            </div>
+            <p className="mt-2 text-lg font-bold text-slate-900">Multi-mode collection</p>
+            <p className="text-xs text-slate-400">Cash, card, UPI, gateway and direct billing</p>
+          </div>
+
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Invoices
+              </span>
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-lg"
+                style={{ background: 'linear-gradient(135deg,#fdf2f8,#fff1f2)' }}
+              >
+                <FileText className="h-3.5 w-3.5 text-pink-500" />
+              </div>
+            </div>
+            <p className="mt-2 text-lg font-bold text-slate-900">GST workflow</p>
+            <p className="text-xs text-slate-400">Preview, generate, download and email</p>
+          </div>
+
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                Settlement
+              </span>
+              <div
+                className="flex h-7 w-7 items-center justify-center rounded-lg"
+                style={{ background: 'linear-gradient(135deg,#fffbeb,#fff7ed)' }}
+              >
+                <Clock3 className="h-3.5 w-3.5 text-amber-500" />
+              </div>
+            </div>
+            <p className="mt-2 text-lg font-bold text-slate-900">Validate and close</p>
+            <p className="text-xs text-slate-400">Checkout review, settlement and closure</p>
           </div>
         </div>
 
         {showRecon ? <ReconciliationPanel /> : null}
 
-       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-1">
-          <FolioListPanel
-            onSelect={setSelectedFolioId}
-            selectedFolioId={selectedFolioId}
-          />
-        </div>
-
-  <div className="lg:col-span-2">
-    {selectedFolioId ? (
-      <FolioDetailPanel folioId={selectedFolioId} />
-    ) : (
-      <Card className="border-white/60 bg-white/80 shadow-xl backdrop-blur">
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="mb-4 rounded-3xl bg-gradient-to-br from-orange-500 to-pink-500 p-4 text-white shadow-lg">
-            <Receipt className="h-8 w-8" />
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+          <div className="lg:col-span-4 xl:col-span-4">
+            <FolioListPanel
+              onSelect={setSelectedFolioId}
+              selectedFolioId={selectedFolioId}
+            />
           </div>
-          <h3 className="text-lg font-semibold text-slate-900">Select a folio</h3>
-          <p className="mt-2 max-w-sm text-sm text-slate-500">
-            Pick an open or unsettled folio from the left to manage charges, payments,
-            settlement, invoice preview and reconciliation actions.
-          </p>
-        </div>
-      </Card>
-    )}
-  </div>
-</div>
 
-<SettledGuestsTable />
+          <div className="lg:col-span-8 xl:col-span-8">
+            {selectedFolioId ? (
+              <FolioDetailPanel folioId={selectedFolioId} />
+            ) : (
+              <Card className="overflow-hidden border-white/60 bg-white/85 shadow-xl backdrop-blur">
+                <div className="relative p-0">
+                  <div className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50 px-6 py-5">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg"
+                        style={{
+                          background: 'linear-gradient(135deg,#F97316,#F43F5E)',
+                          boxShadow: '0 10px 24px rgba(249,115,22,0.24)',
+                        }}
+                      >
+                        <Receipt className="h-5 w-5" />
+                      </div>
+
+                      <div>
+                        <p className="text-lg font-bold text-slate-900">
+                          No folio selected
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Choose an item from the folio queue to start billing actions
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+                    <div
+                      className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl text-white shadow-lg"
+                      style={{
+                        background: 'linear-gradient(135deg,#fb923c,#f472b6)',
+                        boxShadow: '0 10px 24px rgba(244,114,182,0.20)',
+                      }}
+                    >
+                      <Receipt className="h-9 w-9" />
+                    </div>
+
+                    <h3 className="text-xl font-bold text-slate-900">Select a folio</h3>
+
+                    <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-500">
+                      Pick an open or unsettled folio from the left to manage
+                      charges, payments, invoice preview, GST generation, settlement
+                      and closure.
+                    </p>
+
+                    <div className="mt-6 grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          Step 1
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-slate-800">
+                          Choose folio
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Open or unsettled folios appear in the queue.
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          Step 2
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-slate-800">
+                          Complete billing
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Post charges, collect payment, review taxes.
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          Step 3
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-slate-800">
+                          Generate invoice
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Download, email, settle and close the folio.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
+
+        <SettledGuestsTable />
       </div>
     </DashboardLayout>
   );

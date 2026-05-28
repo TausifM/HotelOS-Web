@@ -1,11 +1,11 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { formatCurrency } from '@/lib/utils';
 import {
-    Calendar, Users, ChevronRight, Star, Wifi, Wind,
+    Calendar, ChevronRight, Star, Wifi, Wind,
     Tv, Coffee, CheckCircle, ArrowLeft, Shield,
     Phone, Mail, User, CreditCard, Loader2, BedDouble,
 } from 'lucide-react';

@@ -15,6 +15,15 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
   )
 }
 
+function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div>
+      <h3 className="text-sm font-bold tracking-wide text-slate-900">{title}</h3>
+      {subtitle ? <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p> : null}
+    </div>
+  );
+} 
+
 function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -89,4 +98,5 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+  SectionTitle,
 }

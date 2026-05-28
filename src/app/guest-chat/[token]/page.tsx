@@ -1271,9 +1271,13 @@ export default function GuestChatPage({
       { id: tempId, role: 'guest', text, timestamp: new Date(), type: 'text', status: 'sending' },
     ]);
     try {
-      const res = await apiFetch<any>('/api/chatbot/guest/message', {
+      const res = await apiFetch('/api/chatbot/guest/message', {
         method: 'POST',
-        body: JSON.stringify({ token, text }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text }),
       });
       // FIX: _id first (MongoDB), then id, then fallback
       const savedId = res?.data?.message?._id ?? res?.data?.message?.id ?? tempId;

@@ -53,7 +53,8 @@ interface GuestForm {
 function openWhatsApp(phone: string, message: string) {
   const cleaned = phone.replace(/\D/g, '');
   const number = cleaned.startsWith('91') ? cleaned : `91${cleaned}`;
-  window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank');
+  const url = `https://api.whatsapp.com/send?phone=${number}&text=${encodeURIComponent(message)}`;
+  window.open(url, '_blank');
 }
 
 const EMPTY_FORM: GuestForm = {
@@ -121,7 +122,6 @@ export default function NewGuestPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const { tenant } = useAuth();
-  console.log(tenant, "tenant")
 
   const hotelName = tenant?.hotelName || 'Your Hotel';
   'Your Hotel';
@@ -222,15 +222,24 @@ export default function NewGuestPage() {
       setStep(3);
 
       if (form.phone && form.whatsappOptIn) {
-        const message =
-          `🌟 *Welcome to ${hotelName}!*` +
-          `\n\nHello ${form.firstName}!` +
-          `\n\nYou've been registered as a guest with us.` +
-          `\n\n🪪 *Membership ID:* ${guest.loyalty?.membershipId || 'Assigned'}` +
-          `\n🏆 *Loyalty Tier:* Bronze` +
-          `\n\nYou'll earn points on every stay, redeemable for discounts.` +
-          `\n\nWe look forward to hosting you! 🏨` +
-          `\n\n_Reply to this message anytime for assistance._`;
+        const EMOJI = {
+        star: '\u{1F31F}',
+        card: '\u{1FAAA}',
+        trophy: '\u{1F3C6}',
+        hotel: '\u{1F3E8}',
+        sparkles: '\u{2728}',
+        };
+
+      const message =
+        `${EMOJI.star} *Welcome to ${hotelName}!*` +
+        `\n\nHello ${form.firstName}!` +
+        `\n\nYou've been registered as a guest with us.` +
+        `\n\n${EMOJI.card} *Membership ID:* ${guest.loyalty?.membershipId || 'Assigned'}` +
+        `\n${EMOJI.trophy} *Loyalty Tier:* Bronze` +
+        `\n\nYou'll earn points on every stay, redeemable for discounts.` +
+        `\n\nWe look forward to hosting you! ${EMOJI.hotel}` +
+        `\n\n${EMOJI.sparkles} *Thank you for choosing us!*` +
+        `\n\n_Reply to this message anytime for assistance._`;
 
         openWhatsApp(form.phone, message);
         toast.success('Guest registered! WhatsApp welcome opened.');
