@@ -3,18 +3,11 @@ import { notFound } from "next/navigation";
 import { landingPages, landingSlugs } from "@/lib/landing-data";
 
 import Navbar from "@/components/components/Navbar";
-// import Hero from "@/components/components/Hero";
-// import Problem from "@/components/components/Problem";
-// import Features from "@/components/components/Features";
-// import HowItWorks from "@/components/components/HowItWorks";
-// import Stats from "@/components/components/Stats";
 import Pricing from "@/components/components/Pricing";
 import Testimonials from "@/components/components/Testimonials";
 import Comparison from "@/components/components/Comparison";
 import About from "@/components/components/About";
-// import FAQ from "@/components/components/FAQ";
 import Contact from "@/components/components/Contact";
-// import CTABanner from "@/components/components/CTABanner";
 import Footer from "@/components/components/Footer";
 import WhatsAppButton from "@/components/components/WhatsAppButton";
 import Link from "next/link";
@@ -29,15 +22,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!config) return {};
 
   return {
-    title: config.title,
+    title: `${config.title} | Hotelos`,
     description: config.description,
-    keywords: config.keywords,
+    keywords: [
+      "hotelos",
+      "hotel os",
+      "hotel operating system",
+      "hotel os software",
+      "hotelos online",
+      "hotel management software India",
+      "cloud hotel PMS",
+      ...config.keywords,
+    ],
     alternates: { canonical: config.canonical },
     openGraph: {
       title: config.ogTitle,
       description: config.ogDescription,
       url: config.canonical,
-      siteName: "HoteloS",
+      siteName: "Hotelos",
       locale: "en_IN",
       type: "website",
       images: [
@@ -54,6 +56,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: config.ogTitle,
       description: config.ogDescription,
       images: [`https://hotelos.online/og-${landing}.jpg`],
+      creator: "@Hotelos",
+      site: "@Hotelos",
     },
     robots: {
       index: true,
@@ -71,28 +75,85 @@ export default async function LandingPage({ params }: Props) {
   const config = landingPages[landing];
   if (!config) notFound();
 
+  // Keyword-rich brand statement injected on every landing page
+  const brandStatement = `Hotelos (hotelos.online) is India's leading hotel operating system — a complete hotel OS software trusted by 12,000+ hotels.`;
+
   return (
     <main className="min-h-screen bg-[#FDFCFB] overflow-x-hidden">
-      {/* FAQPage Schema */}
+      {/* ===== Organization Schema (injected on every landing page) ===== */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Hotelos",
+            alternateName: ["Hotel OS", "hotelos.online", "Hotel Operating System"],
+            url: "https://hotelos.online",
+            logo: "https://hotelos.online/logo.png",
+            sameAs: [
+              "https://twitter.com/Hotelos",
+              "https://linkedin.com/company/hotelos",
+              "https://facebook.com/Hotelos",
+              "https://instagram.com/Hotelos",
+            ],
+          }),
+        }}
+      />
+
+      {/* ===== SoftwareApplication Schema ===== */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: "Hotelos",
+            alternateName: "Hotel OS Software",
+            applicationCategory: "BusinessApplication",
+            operatingSystem: "Web",
+            description: "India's smartest hotel operating system with AI revenue intelligence, WhatsApp automation, and GST billing.",
+            url: "https://hotelos.online",
+            offers: {
+              "@type": "Offer",
+              price: "1500",
+              priceCurrency: "INR",
+              priceSpecification: {
+                "@type": "UnitPriceSpecification",
+                price: "1500",
+                priceCurrency: "INR",
+                unitText: "MONTH",
+              },
+            },
+            aggregateRating: {
+              "@type": "AggregateRating",
+              ratingValue: "4.9",
+              ratingCount: "12000",
+            },
+          }),
+        }}
+      />
+
+      {/* ===== FAQPage Schema ===== */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "FAQPage",
-            "mainEntity": config.faqs.map((faq) => ({
+            mainEntity: config.faqs.map((faq) => ({
               "@type": "Question",
-              "name": faq.question,
-              "acceptedAnswer": {
+              name: faq.question,
+              acceptedAnswer: {
                 "@type": "Answer",
-                "text": faq.answer,
+                text: faq.answer,
               },
             })),
           }),
         }}
       />
 
-      {/* BreadcrumbList Schema */}
+      {/* ===== BreadcrumbList Schema ===== */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -103,7 +164,7 @@ export default async function LandingPage({ params }: Props) {
               {
                 "@type": "ListItem",
                 position: 1,
-                name: "Home",
+                name: "Hotelos",
                 item: "https://hotelos.online",
               },
               {
@@ -113,25 +174,6 @@ export default async function LandingPage({ params }: Props) {
                 item: config.canonical,
               },
             ],
-          }),
-        }}
-      />
-
-      {/* WebPage Schema */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "WebPage",
-            name: config.title,
-            description: config.description,
-            url: config.canonical,
-            mainEntity: {
-              "@type": "SoftwareApplication",
-              name: "HoteloS",
-              applicationCategory: "BusinessApplication",
-            },
           }),
         }}
       />
@@ -147,6 +189,10 @@ export default async function LandingPage({ params }: Props) {
           <p className="mt-6 text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
             {config.heroSubtitle}
           </p>
+          {/* Brand keyword ribbon */}
+          <p className="mt-4 text-sm text-gray-500 max-w-2xl mx-auto">
+            {brandStatement}
+          </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/auth/register"
@@ -161,6 +207,20 @@ export default async function LandingPage({ params }: Props) {
               Watch Demo
             </a>
           </div>
+        </div>
+      </section>
+
+      {/* ===== KEYWORD CONTEXT SECTION (NEW) ===== */}
+      <section className="py-8 px-4 sm:px-6 lg:px-8 bg-orange-50 border-y border-orange-100">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-gray-700 leading-relaxed">
+            Looking for a <strong>hotel operating system</strong>? {" "}
+            <Link href="https://hotelos.online" className="text-orange-700 font-semibold hover:underline">
+              Hotelos
+            </Link>{" "}
+            is the all-in-one <strong>hotel OS software</strong> built for Indian hotels. Whether you search for {" "}
+            <strong>hotelos online</strong>, <strong>hotel OS</strong>, or <strong>hotel operating system</strong>, you are in the right place.
+          </p>
         </div>
       </section>
 
@@ -191,7 +251,7 @@ export default async function LandingPage({ params }: Props) {
             Everything You Need
           </h2>
           <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            Built specifically for Indian hospitality businesses
+            Built specifically for Indian hospitality businesses using the Hotelos hotel operating system
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {config.features.map((feature, i) => (
@@ -292,6 +352,13 @@ export default async function LandingPage({ params }: Props) {
           </h2>
           <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">
             {config.ctaSubtitle}
+          </p>
+          {/* Internal link to homepage with exact brand anchor */}
+          <p className="mb-6 text-gray-400 text-sm">
+            Powered by{" "}
+            <Link href="https://hotelos.online" className="text-orange-400 hover:underline">
+              Hotelos — Hotel OS Software
+            </Link>
           </p>
           <Link
             href="/auth/register"
