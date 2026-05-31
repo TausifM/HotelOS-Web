@@ -393,6 +393,14 @@ const ROLE_DEFAULT_PERMS: Record<string, string[]> = {
   maintenance: ['rooms.read', 'rooms.updatestatus', 'inventory.read', 'inventory.update', 'housekeeping.read'],
   hr: ['staff.read', 'staff.create', 'staff.update', 'attendance.read', 'attendance.mark', 'payroll.read', 'payroll.manage', 'reports.read'],
 };
+const OPTIONAL_LOGIN_ROLES: Role[] = [
+  'housekeeping',
+  'security',
+  'maintenance',
+  'restaurant',
+];
+
+const roleNeedsToggle = (role: Role) => OPTIONAL_LOGIN_ROLES.includes(role);
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -905,13 +913,25 @@ function StaffFormModal({
     isActive: true,
   });
 
+  const NO_PASSWORD_ROLES: Role[] = [
+    'housekeeping',
+    'security',
+    'maintenance',
+    'restaurant',
+  ];
+
+  const needsPasswordForRole = (role: Role) => !NO_PASSWORD_ROLES.includes(role);
+
   useEffect(() => {
     if (!open) return;
+
+    const nextRole = ((editing?.role as Exclude<Role, 'owner'>) || 'front_desk');
+
     setForm({
       name: editing?.name || '',
       email: editing?.email || '',
       phone: editing?.phone || '',
-      role: ((editing?.role as Exclude<Role, 'owner'>) || 'front_desk'),
+      role: nextRole,
       department: editing?.department || '',
       employeeId: editing?.employeeId || '',
       password: '',
@@ -929,7 +949,9 @@ function StaffFormModal({
       emergencyContactName: editing?.emergencyContactName || '',
       emergencyContactPhone: editing?.emergencyContactPhone || '',
       reportingManagerId:
-        typeof editing?.reportingManagerId === 'object' ? editing?.reportingManagerId?._id || '' : editing?.reportingManagerId || '',
+        typeof editing?.reportingManagerId === 'object'
+          ? editing?.reportingManagerId?._id || ''
+          : editing?.reportingManagerId || '',
       avatar: editing?.avatar || '',
       isActive: editing?.isActive ?? true,
     });
@@ -940,7 +962,8 @@ function StaffFormModal({
       if (!form.name.trim() || !form.phone.trim()) {
         throw new Error('Name and phone are required');
       }
-      if (!isEdit && form.password.trim().length < 6) {
+
+      if (!isEdit && needsPasswordForRole(form.role) && form.password.trim().length < 6) {
         throw new Error('Password must be at least 6 characters');
       }
 
@@ -962,6 +985,9 @@ function StaffFormModal({
         emergencyContactPhone: form.emergencyContactPhone || undefined,
         reportingManagerId: form.reportingManagerId || undefined,
         avatar: form.avatar || undefined,
+        password: !isEdit && needsPasswordForRole(form.role)
+          ? form.password.trim()
+          : undefined,
       };
 
       if (isEdit) {
@@ -1044,7 +1070,16 @@ function StaffFormModal({
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="Role">
-                <Select value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value as Exclude<Role, 'owner'> }))}>
+                <Select
+                  value={form.role}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      role: e.target.value as Exclude<Role, 'owner'>,
+                      password: '',
+                    }))
+                  }
+                >
                   {Object.entries(ROLE_META).map(([value, meta]) => (
                     <option key={value} value={value}>
                       {meta.label}
@@ -1052,6 +1087,7 @@ function StaffFormModal({
                   ))}
                 </Select>
               </Field>
+
               <Field label="Department">
                 <Select value={form.department} onChange={(e) => setForm((p) => ({ ...p, department: e.target.value }))}>
                   <option value="">Select department</option>
@@ -1062,6 +1098,7 @@ function StaffFormModal({
                   ))}
                 </Select>
               </Field>
+
               <Field label="Employment Type">
                 <Select value={form.employmentType} onChange={(e) => setForm((p) => ({ ...p, employmentType: e.target.value }))}>
                   {EMPLOYMENT_TYPES.map((x) => (
@@ -1071,9 +1108,11 @@ function StaffFormModal({
                   ))}
                 </Select>
               </Field>
+
               <Field label="Joining Date">
                 <Input type="date" value={form.joiningDate} onChange={(e) => setForm((p) => ({ ...p, joiningDate: e.target.value }))} />
               </Field>
+
               <Field label="Shift">
                 <Select value={form.shift} onChange={(e) => setForm((p) => ({ ...p, shift: e.target.value }))}>
                   {SHIFTS.map((x) => (
@@ -1083,6 +1122,7 @@ function StaffFormModal({
                   ))}
                 </Select>
               </Field>
+
               <Field label="Active Status">
                 <Select
                   value={String(form.isActive)}
@@ -1092,12 +1132,15 @@ function StaffFormModal({
                   <option value="false">Inactive</option>
                 </Select>
               </Field>
+
               <Field label="Shift Start">
                 <Input type="time" value={form.shiftStart} onChange={(e) => setForm((p) => ({ ...p, shiftStart: e.target.value }))} />
               </Field>
+
               <Field label="Shift End">
                 <Input type="time" value={form.shiftEnd} onChange={(e) => setForm((p) => ({ ...p, shiftEnd: e.target.value }))} />
               </Field>
+
               <Field label="Monthly Salary">
                 <Input
                   type="number"
@@ -1150,6 +1193,7 @@ function StaffFormModal({
                 />
               </Field>
             </div>
+
             {!isEdit ? (
               <div className="mt-4 rounded-2xl border border-pink-200 bg-pink-50 px-4 py-3 text-sm text-pink-700">
                 Default role permissions can be applied right after creation from the Access modal.
@@ -1180,7 +1224,7 @@ function StaffFormModal({
             </div>
           </section>
 
-          {!isEdit ? (
+          {!isEdit && needsPasswordForRole(form.role) ? (
             <section className="rounded-[28px] border border-amber-100 bg-white/80 p-5 shadow-sm">
               <div className="mb-4 flex items-center gap-2">
                 <KeyRound className="h-4 w-4 text-amber-500" />
@@ -1807,13 +1851,23 @@ export default function StaffPage() {
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | ''>('active');
   const [page] = useState(1);
   const [limit] = useState(100);
-
-  const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const [payrollStaff, setPayrollStaff] = useState<Staff | null>(null);
   const [permStaff, setPermStaff] = useState<Staff | null>(null);
   const [resetStaff, setResetStaff] = useState<Staff | null>(null);
   const [deactivateStaff, setDeactivateStaff] = useState<Staff | null>(null);
+
+  const handleEdit = async (staff: Staff) => {
+    try {
+      const id = getId(staff);
+      const res = await api.get(`/api/staff/${id}`);
+      console.log('staff details:', res.data.data);
+      setEditing(res.data.data);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to load staff details');
+    }
+  };
 
   const meQuery = useQuery({
     queryKey: ['staff-me'],
@@ -2079,7 +2133,7 @@ export default function StaffPage() {
                     canManage={canManage}
                     canViewPayroll={canViewPayroll}
                     canDeactivate={canDeactivate}
-                    onEdit={setEditing}
+                    onEdit={handleEdit}
                     onPayroll={setPayrollStaff}
                     onPermissions={setPermStaff}
                     onResetPassword={setResetStaff}

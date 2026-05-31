@@ -117,12 +117,12 @@ function TaskCard({
 
   const p =
     PRIORITY_CONFIG[
-      task.priority
+    task.priority
     ] || PRIORITY_CONFIG.normal;
 
   const actions =
     STATUS_ACTIONS[
-      task.status
+    task.status
     ] || [];
 
   return (
@@ -191,7 +191,7 @@ function TaskCard({
               <span className="text-[11px] font-semibold text-gray-700">
                 {
                   TASK_LABELS[
-                    task.taskType
+                  task.taskType
                   ]
                 }
               </span>
@@ -510,37 +510,37 @@ function TaskCard({
             {/* Issues */}
             {task.issues?.length >
               0 && (
-              <div>
+                <div>
 
-                <p className="text-[10px] font-bold uppercase tracking-wide text-red-400 mb-1">
-                  Issues
-                </p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-red-400 mb-1">
+                    Issues
+                  </p>
 
-                <div className="space-y-1">
-                  {task.issues.map(
-                    (
-                      issue: string,
-                      idx: number
-                    ) => (
-                      <div
-                        key={idx}
-                        className="
+                  <div className="space-y-1">
+                    {task.issues.map(
+                      (
+                        issue: string,
+                        idx: number
+                      ) => (
+                        <div
+                          key={idx}
+                          className="
                           flex
                           items-start
                           gap-1.5
                           text-[11px]
                           text-red-600
                         "
-                      >
-                        <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        >
+                          <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
 
-                        {issue}
-                      </div>
-                    )
-                  )}
+                          {issue}
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Created */}
             <div className="pt-1 border-t border-gray-200">
@@ -1200,6 +1200,17 @@ export default function HousekeepingPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [deletingTask, setDeletingTask] = useState<any>(null);
+
+  const refreshOpsQueries = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['housekeeping', today] }),
+      qc.invalidateQueries({ queryKey: ['housekeeping-history'] }),
+      qc.invalidateQueries({ queryKey: ['maintenance-history'] }),
+      qc.invalidateQueries({ queryKey: ['housekeeping-staff'] }),
+    ]);
+  };
+
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['housekeeping', today],
     queryFn: () => api.get('/api/housekeeping', { params: { date: today } }).then(r => r.data.data),
@@ -1213,19 +1224,71 @@ export default function HousekeepingPage() {
     refetchInterval: 30_000,
   });
 
-  useSocketEvent('housekeeping:updated', () => qc.invalidateQueries({ queryKey: ['housekeeping', today] }));
-  useSocketEvent('housekeeping:new', () => qc.invalidateQueries({ queryKey: ['housekeeping', today] }));
+  useSocketEvent('housekeeping:updated', () => {
+    refreshOpsQueries();
+  });
+
+  useSocketEvent('housekeeping:new', () => {
+    refreshOpsQueries();
+  });
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status, extras }: { id: string; status: string; extras?: any }) =>
       api.patch(`/api/housekeeping/${id}/status`, { status, ...extras }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['housekeeping', today] });
+    onSuccess: async () => {
+      await refreshOpsQueries();
       setSelected(null);
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
+  const createTask = useMutation({
+    mutationFn: (payload: any) => {
+      const finalPayload = {
+        ...payload,
+        roomId: payload.roomId || payload.roomNumber,
+      };
+      delete finalPayload.roomNumber;
+      return api.post('/api/housekeeping', finalPayload);
+    },
+    onSuccess: async () => {
+      toast.success('Task created');
+      await refreshOpsQueries();
+      setCreateOpen(false);
+    },
+    onError: (e: any) =>
+      toast.error(e.response?.data?.message || 'Failed to create task'),
+  });
+
+  const editTask = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: any }) => {
+      const finalPayload = {
+        ...payload,
+        roomId: payload.roomId || payload.roomNumber,
+      };
+      delete finalPayload.roomNumber;
+      return api.put(`/api/housekeeping/${id}`, finalPayload);
+    },
+    onSuccess: async () => {
+      toast.success('Task updated');
+      await refreshOpsQueries();
+      setEditingTask(null);
+      setSelected(null);
+    },
+    onError: (e: any) =>
+      toast.error(e.response?.data?.message || 'Failed to update task'),
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/housekeeping/${id}`),
+    onSuccess: async () => {
+      toast.success('Task deleted');
+      await refreshOpsQueries();
+      setDeletingTask(null);
+      setSelected(null);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to delete task'),
+  });
   async function loadAIPriorities() {
     setAiLoading(true);
     try {
@@ -1245,57 +1308,7 @@ export default function HousekeepingPage() {
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed'); }
     finally { setAutoAssigning(false); }
   }
-const createTask = useMutation({
-  mutationFn: (payload: any) => {
-    const finalPayload = {
-      ...payload,
-      roomId: payload.roomId || payload.roomNumber,
-    };
 
-    delete finalPayload.roomNumber;
-
-    return api.post('/api/housekeeping', finalPayload);
-  },
-  onSuccess: () => {
-    toast.success('Task created');
-    qc.invalidateQueries({ queryKey: ['housekeeping', today] });
-    setCreateOpen(false);
-  },
-  onError: (e: any) =>
-    toast.error(e.response?.data?.message || 'Failed to create task'),
-});
-
-const editTask = useMutation({
-  mutationFn: ({ id, payload }: { id: string; payload: any }) => {
-    const finalPayload = {
-      ...payload,
-      roomId: payload.roomId || payload.roomNumber,
-    };
-
-    delete finalPayload.roomNumber;
-
-    return api.put(`/api/housekeeping/${id}`, finalPayload);
-  },
-  onSuccess: () => {
-    toast.success('Task updated');
-    qc.invalidateQueries({ queryKey: ['housekeeping', today] });
-    setEditingTask(null);
-    setSelected(null);
-  },
-  onError: (e: any) =>
-    toast.error(e.response?.data?.message || 'Failed to update task'),
-});
-
-  const deleteTaskMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/api/housekeeping/${id}`),
-    onSuccess: () => {
-      toast.success('Task deleted');
-      qc.invalidateQueries({ queryKey: ['housekeeping', today] });
-      setDeletingTask(null);
-      setSelected(null);
-    },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to delete task'),
-  });
   const tasks = data?.docs || [];
   const summary = data?.summary || {};
 
@@ -1308,15 +1321,15 @@ const editTask = useMutation({
 
   const byStatus: Record<string, any[]> = {};
   COLS.forEach(c => { byStatus[c.key] = filtered.filter((t: any) => t.status === c.key); });
-const { data: hkRes, isLoading: hkLoading } = useQuery({
-  queryKey: ['housekeeping-history'],
-  queryFn: () => api.get('/api/housekeeping/history').then((r) => r.data.data),
-});
+  const { data: hkRes, isLoading: hkLoading } = useQuery({
+    queryKey: ['housekeeping-history'],
+    queryFn: () => api.get('/api/housekeeping/history').then((r) => r.data.data),
+  });
 
-const { data: mtRes, isLoading: mtLoading } = useQuery({
-  queryKey: ['maintenance-history'],
-  queryFn: () => api.get('/api/housekeeping/maintenance/history').then((r) => r.data.data),
-});
+  const { data: mtRes, isLoading: mtLoading } = useQuery({
+    queryKey: ['maintenance-history'],
+    queryFn: () => api.get('/api/housekeeping/maintenance/history').then((r) => r.data.data),
+  });
 
 
   return (
@@ -1542,11 +1555,11 @@ const { data: mtRes, isLoading: mtLoading } = useQuery({
           isPending={deleteTaskMutation.isPending}
         />
       )}
-  <PreviousOpsTasks
-  housekeepingTasks={hkRes?.docs ?? hkRes ?? []}
-  maintenanceTasks={mtRes?.docs ?? mtRes ?? []}
-  loading={hkLoading || mtLoading}
-/>
+      <PreviousOpsTasks
+        housekeepingTasks={hkRes?.docs ?? hkRes ?? []}
+        maintenanceTasks={mtRes?.docs ?? mtRes ?? []}
+        loading={hkLoading || mtLoading}
+      />
     </DashboardLayout>
   );
 }

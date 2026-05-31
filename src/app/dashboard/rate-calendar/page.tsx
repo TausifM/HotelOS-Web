@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -35,6 +35,7 @@ import {
   getDay,
   addMonths,
   subMonths,
+  parseISO,
 } from 'date-fns';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -73,24 +74,34 @@ const UI = {
   textMuted: '#A8836C',
   melonPale: '#FFF3E6',
   melonLight: '#FED7AA',
+  coralPale: '#FFF1F2',
+  coralLight: '#FECDD3',
+  amberPale: '#FFFBEB',
+  amberLight: '#FDE68A',
+  tealPale: '#F0FDFA',
+  tealLight: '#99F6E4',
 };
 
 function rateColor(customRate: number | undefined, baseRate: number, aiRate: number | undefined) {
   const effective = customRate ?? baseRate;
+
+  if (customRate && !aiRate) return 'bg-[#FFF7ED] border-[#FED7AA]';
   if (!aiRate) return 'bg-white border-[#F0E4D8]';
+
   const diff = ((effective - aiRate) / aiRate) * 100;
-  if (diff < -10) return 'bg-red-50 border-red-200';
-  if (diff > 10) return 'bg-blue-50 border-blue-200';
-  return 'bg-emerald-50 border-emerald-200';
+  if (diff < -10) return 'bg-[#FFF1F2] border-[#FECDD3]';
+  if (diff > 10) return 'bg-[#FFFBEB] border-[#FDE68A]';
+  return 'bg-[#F0FDFA] border-[#99F6E4]';
 }
 
 function rateStatus(customRate: number | undefined, baseRate: number, aiRate: number | undefined) {
   const effective = customRate ?? baseRate;
   if (!aiRate) return null;
+
   const diff = ((effective - aiRate) / aiRate) * 100;
-  if (diff < -10) return { icon: TrendingUp, label: 'Raise', color: 'text-red-500' };
-  if (diff > 10) return { icon: TrendingDown, label: 'Lower', color: 'text-blue-500' };
-  return { icon: Check, label: 'Optimal', color: 'text-emerald-600' };
+  if (diff < -10) return { icon: TrendingUp, label: 'Raise', color: 'text-[#E11D48]' };
+  if (diff > 10) return { icon: TrendingDown, label: 'Lower', color: 'text-[#D97706]' };
+  return { icon: Check, label: 'Optimal', color: 'text-[#0F766E]' };
 }
 
 function GlassStat({
@@ -145,120 +156,167 @@ function DayCell({
 }) {
   const weekend = isWeekend(date);
   const effectiveRate = dayData?.customRate ?? dayData?.baseRate ?? 0;
-  const colorCls = dayData ? rateColor(dayData.customRate, dayData.baseRate, dayData.aiRate) : 'bg-white border-[#F0E4D8]';
-  const status = dayData ? rateStatus(dayData.customRate, dayData.baseRate, dayData.aiRate) : null;
+  const colorCls = dayData
+    ? rateColor(dayData.customRate, dayData.baseRate, dayData.aiRate)
+    : 'bg-white border-[#F0E4D8]';
+  const status = dayData
+    ? rateStatus(dayData.customRate, dayData.baseRate, dayData.aiRate)
+    : null;
 
- return (
-  <motion.button
-    type="button"
-    whileHover={!isPast ? { y: -2, scale: 1.015 } : undefined}
-    whileTap={!isPast ? { scale: 0.985 } : undefined}
-    onClick={() => !isPast && onSelect(date)}
-    onDoubleClick={() => !isPast && onEdit(date)}
-    className={`relative min-h-[102px] rounded-2xl border p-3 text-left transition-all overflow-hidden
+  return (
+    <motion.div
+      whileHover={!isPast ? { y: -2, scale: 1.015 } : undefined}
+      whileTap={!isPast ? { scale: 0.985 } : undefined}
+      onClick={() => !isPast && onSelect(date)}
+      className={`relative min-h-[118px] rounded-2xl border p-3 text-left transition-all overflow-hidden cursor-pointer
       ${isPast ? 'opacity-45 cursor-default bg-[#FCFAF8] border-[#F3ECE5]' : colorCls}
       ${weekend && !isPast ? 'border-dashed' : ''}`}
-    style={{
-      boxShadow: isPast
-        ? 'none'
-        : isSelected
-          ? `0 0 0 2px ${UI.melon}, 0 0 0 6px rgba(249,115,22,0.14), 0 8px 22px rgba(28,10,2,0.04)`
-          : isToday
-            ? `0 0 0 2px ${UI.amber}, 0 0 0 6px rgba(245,158,11,0.16), 0 8px 22px rgba(28,10,2,0.04)`
-            : '0 8px 22px rgba(28,10,2,0.04)',
-    }}
-  >
-    {!isPast && (dayData?.customRate || isSelected) && (
-      <div
-        className="absolute inset-x-0 top-0 h-1"
-        style={{
-          background: dayData?.customRate
-            ? `linear-gradient(90deg, ${UI.melon}, ${UI.coral})`
-            : `linear-gradient(90deg, ${UI.amber}, ${UI.melon})`,
-        }}
-      />
-    )}
-
-    {weekend && !isPast && (
-      <span
-        className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-        style={{
-          background: UI.melonPale,
-          color: UI.melon,
-          border: `1px solid ${UI.melonLight}`,
-        }}
-      >
-        Weekend
-      </span>
-    )}
-
-    <div className="flex items-start justify-between pr-14">
-      <div>
-        <p
-          className="text-[11px] font-bold"
+      style={{
+        boxShadow: isPast
+          ? 'none'
+          : isSelected
+            ? `0 0 0 2px ${UI.melon}, 0 0 0 6px rgba(249,115,22,0.14), 0 8px 22px rgba(28,10,2,0.04)`
+            : isToday
+              ? `0 0 0 2px ${UI.amber}, 0 0 0 6px rgba(245,158,11,0.16), 0 8px 22px rgba(28,10,2,0.04)`
+              : '0 8px 22px rgba(28,10,2,0.04)',
+      }}
+    >
+      {!isPast && (dayData?.customRate || isSelected) && (
+        <div
+          className="absolute inset-x-0 top-0 h-1"
           style={{
-            color: isToday ? UI.amber : isPast ? '#B9A79A' : weekend ? UI.melon : UI.textSub,
+            background: dayData?.customRate
+              ? `linear-gradient(90deg, ${UI.melon}, ${UI.coral})`
+              : `linear-gradient(90deg, ${UI.amber}, ${UI.melon})`,
+          }}
+        />
+      )}
+
+      {weekend && !isPast && (
+        <span
+          className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+          style={{
+            background: UI.melonPale,
+            color: UI.melon,
+            border: `1px solid ${UI.melonLight}`,
           }}
         >
-          {format(date, 'd')}
-        </p>
-        <p className="text-[10px] mt-0.5" style={{ color: UI.textMuted }}>
-          {format(date, 'EEE')}
-        </p>
-      </div>
-
-      {status && !isPast && (
-        <div className={`rounded-full p-1 ${status.color}`} style={{ background: '#fff' }}>
-          <status.icon className="w-3 h-3" />
-        </div>
+          Weekend
+        </span>
       )}
-    </div>
 
-    {effectiveRate > 0 && (
-      <div className="mt-3">
-        <p
-          className="text-sm font-bold leading-none"
-          style={{ color: dayData?.customRate ? UI.melon : UI.text }}
-        >
-          ₹{(effectiveRate / 1000).toFixed(1)}k
-        </p>
-
-        {dayData?.aiRate && dayData.aiRate !== effectiveRate && (
-          <p className="text-[10px] mt-1" style={{ color: UI.textMuted }}>
-            AI: ₹{(dayData.aiRate / 1000).toFixed(1)}k
+      <div className="flex items-start justify-between pr-14">
+        <div>
+          <p
+            className="text-[11px] font-bold"
+            style={{
+              color: isToday ? UI.amber : isPast ? '#B9A79A' : weekend ? UI.melon : UI.textSub,
+            }}
+          >
+            {format(date, 'd')}
           </p>
+          <p className="text-[10px] mt-0.5" style={{ color: UI.textMuted }}>
+            {format(date, 'EEE')}
+          </p>
+        </div>
+
+        {status && !isPast && (
+          <div className={`rounded-full p-1 ${status.color}`} style={{ background: '#fff' }}>
+            <status.icon className="w-3 h-3" />
+          </div>
         )}
       </div>
-    )}
 
-    {dayData?.occupancyPct !== undefined && (
-      <div className="mt-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[9px] font-medium" style={{ color: UI.textMuted }}>
-            Occ
-          </span>
-          <span className="text-[9px] font-bold" style={{ color: UI.textSub }}>
-            {dayData.occupancyPct}%
-          </span>
+      {effectiveRate > 0 && (
+        <div className="mt-3">
+          <p
+            className="text-sm font-bold leading-none"
+            style={{ color: dayData?.customRate ? UI.melon : UI.text }}
+          >
+            {formatCurrency(effectiveRate)}
+          </p>
+
+          {dayData?.aiRate && dayData.aiRate !== effectiveRate && (
+            <p className="text-[10px] mt-1" style={{ color: UI.textMuted }}>
+              AI: {formatCurrency(dayData.aiRate)}
+            </p>
+          )}
         </div>
-        <div className="h-1.5 rounded-full overflow-hidden bg-[#EFE4DA]">
-          <div
-            className="h-full rounded-full"
+      )}
+
+      {dayData?.occupancyPct !== undefined && (
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-medium" style={{ color: UI.textMuted }}>
+              Occ
+            </span>
+            <span className="text-[9px] font-bold" style={{ color: UI.textSub }}>
+              {dayData.occupancyPct}%
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden bg-[#EFE4DA]">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${dayData.occupancyPct}%`,
+                background:
+                  dayData.occupancyPct > 80
+                    ? '#EF4444'
+                    : dayData.occupancyPct > 50
+                      ? UI.amber
+                      : '#22C55E',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-2 flex items-center justify-between gap-2">
+        {dayData?.customRate ? (
+          <span
+            className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold"
             style={{
-              width: `${dayData.occupancyPct}%`,
-              background:
-                dayData.occupancyPct > 80
-                  ? '#EF4444'
-                  : dayData.occupancyPct > 50
-                    ? UI.amber
-                    : '#22C55E',
+              background: UI.melonPale,
+              color: UI.melon,
+              border: `1px solid ${UI.melonLight}`,
             }}
-          />
-        </div>
+          >
+            Custom
+          </span>
+        ) : (
+          <span
+            className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold"
+            style={{
+              background: '#F5F5F4',
+              color: UI.textMuted,
+              border: `1px solid ${UI.border}`,
+            }}
+          >
+            Default
+          </span>
+        )}
+
+        {!isPast && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(date);
+            }}
+            className="rounded-xl px-2.5 py-1 text-[10px] font-bold transition-all"
+            style={{
+              background: '#fff',
+              color: UI.coral,
+              border: `1px solid ${UI.coralLight}`,
+              boxShadow: '0 4px 10px rgba(244,63,94,0.08)',
+            }}
+          >
+            Edit
+          </button>
+        )}
       </div>
-    )}
-  </motion.button>
-);
+    </motion.div>
+  );
 }
 
 export default function RateCalendarPage() {
@@ -273,22 +331,40 @@ export default function RateCalendarPage() {
   const [bulkRate, setBulkRate] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiRates, setAiRates] = useState<Record<string, DayRate>>({});
-
-  const { data: rooms } = useQuery<Room[]>({
+  const token = useAuthStore((s) => s.accessToken);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
+  const { data: rooms, isLoading: roomsLoading } = useQuery<Room[]>({
     queryKey: ['rooms'],
     queryFn: () =>
       api
-        .get('/api/rooms')
+        .get('/api/rooms', {
+          params: { _t: Date.now() },
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+        })
         .then((r) => (r.data.data?.docs || r.data.data || []).filter((rm: any) => rm.isActive)),
+    enabled: isHydrated && !!token,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
+  const monthKey = format(currentMonth, 'yyyy-MM');
+  const roomRatesKey = ['room-rates', selectedRoom, monthKey] as const;
 
+  const toDateKey = (value: string | Date) => {
+    if (value instanceof Date) return format(value, 'yyyy-MM-dd');
+    const parsed = value.includes('T') ? parseISO(value) : new Date(value);
+    return format(parsed, 'yyyy-MM-dd');
+  };
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  const token = useAuthStore((s) => s.accessToken);
-  const isHydrated = useAuthStore((s) => s.isHydrated);
 
   const { data: rateData, isLoading: ratesLoading } = useQuery({
-    queryKey: ['room-rates', selectedRoom, format(currentMonth, 'yyyy-MM')],
+    queryKey: roomRatesKey,
     queryFn: async () => {
       if (!selectedRoom) return [];
       const res = await api.get('/api/rooms/rates', {
@@ -296,43 +372,103 @@ export default function RateCalendarPage() {
           roomId: selectedRoom,
           startDate: format(monthStart, 'yyyy-MM-dd'),
           endDate: format(monthEnd, 'yyyy-MM-dd'),
+          _t: Date.now(),
+        },
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
         },
       });
       return res.data?.data || [];
     },
     enabled: isHydrated && !!token && !!selectedRoom,
-  });
-
-  const rateMap: Record<string, DayRate> = {};
-  rateData?.forEach((d: DayRate) => {
-    rateMap[d.date] = d;
-  });
-
-  Object.entries(aiRates).forEach(([date, data]: [string, DayRate]) => {
-    if (rateMap[date]) {
-      rateMap[date] = { ...rateMap[date], aiRate: data.aiRate, aiAction: data.aiAction };
-    }
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const updateRateMutation = useMutation({
-    mutationFn: (d: { roomId: string; date: string; rate: number }) => api.post('/api/rooms/rates', d),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['room-rates', selectedRoom] });
+    mutationFn: (d: { roomId: string; date: string; rate: number }) =>
+      api.post('/api/rooms/rates', d),
+
+    onSuccess: (_, vars) => {
+      const key = toDateKey(vars.date);
+
+      qc.setQueryData(roomRatesKey, (old: DayRate[] = []) => {
+        const exists = old.some((d) => toDateKey(d.date) === key);
+
+        if (exists) {
+          return old.map((d) =>
+            toDateKey(d.date) === key
+              ? {
+                ...d,
+                date: key,
+                customRate: vars.rate,
+                baseRate: d.baseRate || selectedRoom_?.baseRate || vars.rate,
+              }
+              : d
+          );
+        }
+
+        return [
+          ...old,
+          {
+            date: key,
+            baseRate: selectedRoom_?.baseRate || vars.rate,
+            customRate: vars.rate,
+          },
+        ];
+      });
+
+      qc.invalidateQueries({ queryKey: roomRatesKey, exact: true });
       toast.success('Rate updated');
       setEditModal(null);
       setNewRate('');
     },
+
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: (d: { roomId: string; dates: string[]; rate: number }) => api.post('/api/rooms/rates/bulk', d),
+    mutationFn: (d: { roomId: string; dates: string[]; rate: number }) =>
+      api.post('/api/rooms/rates/bulk', d),
+
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: ['room-rates', selectedRoom] });
+      const dateSet = new Set(vars.dates.map(toDateKey));
+
+      qc.setQueryData(roomRatesKey, (old: DayRate[] = []) => {
+        const next = [...old];
+
+        dateSet.forEach((dateKey) => {
+          const idx = next.findIndex((d) => toDateKey(d.date) === dateKey);
+
+          if (idx >= 0) {
+            next[idx] = {
+              ...next[idx],
+              date: dateKey,
+              customRate: vars.rate,
+              baseRate: next[idx].baseRate || selectedRoom_?.baseRate || vars.rate,
+            };
+          } else {
+            next.push({
+              date: dateKey,
+              baseRate: selectedRoom_?.baseRate || vars.rate,
+              customRate: vars.rate,
+            });
+          }
+        });
+
+        return next;
+      });
+
+      qc.invalidateQueries({ queryKey: roomRatesKey, exact: true });
       toast.success(`Rate updated for ${vars.dates.length} dates`);
       setSelectedDates([]);
       setBulkRate('');
     },
+
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
@@ -410,10 +546,53 @@ export default function RateCalendarPage() {
 
   const selectedRoom_ = rooms?.find((r) => r._id === selectedRoom);
   const aiChanges = Object.values(aiRates).filter((d) => d.aiAction !== 'hold').length;
+  const rateMap = useMemo<Record<string, DayRate>>(() => {
+    const map: Record<string, DayRate> = {};
 
-  const customDays = Object.values(rateMap).filter((d) => d.customRate).length;
-  const avgRate = rateData?.length
-    ? Math.round(rateData.reduce((s: number, d: DayRate) => s + (d.customRate ?? d.baseRate), 0) / rateData.length)
+    days.forEach((date) => {
+      const key = format(date, 'yyyy-MM-dd');
+      map[key] = {
+        date: key,
+        baseRate: selectedRoom_?.baseRate || 0,
+      };
+    });
+
+    (rateData || []).forEach((d: DayRate) => {
+      const key = toDateKey(d.date);
+      map[key] = {
+        ...map[key],
+        ...d,
+        date: key,
+        baseRate: d.baseRate || map[key]?.baseRate || selectedRoom_?.baseRate || 0,
+      };
+    });
+
+    Object.entries(aiRates).forEach(([date, data]) => {
+      const key = toDateKey(date);
+      map[key] = {
+        ...map[key],
+        aiRate: data.aiRate,
+        aiAction: data.aiAction,
+        occupancyPct: data.occupancyPct ?? map[key]?.occupancyPct,
+        reservations: data.reservations ?? map[key]?.reservations,
+      };
+    });
+
+    return map;
+  }, [days, rateData, aiRates, selectedRoom_?.baseRate]);
+  const customDays = days.filter((d) => {
+    const key = format(d, 'yyyy-MM-dd');
+    return !!rateMap[key]?.customRate;
+  }).length;
+
+  const avgRate = days.length
+    ? Math.round(
+      days.reduce((sum, d) => {
+        const key = format(d, 'yyyy-MM-dd');
+        const row = rateMap[key];
+        return sum + (row?.customRate ?? row?.baseRate ?? 0);
+      }, 0) / days.length
+    )
     : selectedRoom_?.baseRate || 0;
 
   return (
