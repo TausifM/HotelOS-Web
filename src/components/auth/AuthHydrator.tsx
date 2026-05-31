@@ -15,11 +15,14 @@ export default function AuthHydrator() {
 
     const boot = async () => {
       try {
-        await useAuthStore.persist.rehydrate();
+        setCheckingAuth(true);
 
-        const res = await api.get('/api/auth/me', {
-          withCredentials: true,
-        });
+        await useAuthStore.persist.rehydrate();
+        if (!mounted) return;
+
+        const persisted = useAuthStore.getState();
+
+        const res = await api.get('/api/auth/me');
 
         if (!mounted) return;
 
@@ -29,6 +32,8 @@ export default function AuthHydrator() {
           setSession({
             staff: data.staff,
             tenant: data.tenant ?? null,
+            accessToken: data.accessToken ?? persisted.accessToken ?? null,
+            refreshToken: data.refreshToken ?? persisted.refreshToken ?? null,
           });
         } else {
           clearSession();

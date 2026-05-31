@@ -72,15 +72,17 @@ export const useAuthStore = create<AuthState>()(
       setHydrated: () => set({ isHydrated: true }),
       setCheckingAuth: (v) => set({ isCheckingAuth: v }),
 
-      setSession: ({ staff, tenant, accessToken = null, refreshToken = null }) =>
-        set({
-          accessToken,
-          refreshToken,
+      setSession: ({ staff, tenant, accessToken, refreshToken }) =>
+        set((state) => ({
+          accessToken:
+            accessToken !== undefined ? accessToken : state.accessToken,
+          refreshToken:
+            refreshToken !== undefined ? refreshToken : state.refreshToken,
           staff,
           tenant: tenant ?? null,
           isAuthenticated: true,
           isSuperAdmin: staff.role === 'superadmin',
-        }),
+        })),
 
       login: ({ accessToken = null, refreshToken = null, staff, tenant }) =>
         set({
@@ -121,7 +123,6 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'stayos-auth',
-      skipHydration: true,
       partialize: (s) => ({
         accessToken: s.accessToken,
         refreshToken: s.refreshToken,
@@ -136,6 +137,7 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
 interface UIState {
   sidebarOpen: boolean;
   setSidebarOpen: (v: boolean) => void;

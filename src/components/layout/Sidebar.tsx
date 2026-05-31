@@ -153,8 +153,8 @@ function getBadgeClass(badge?: string) {
 export function Sidebar() {
   const pathname = usePathname();
   const { staff, tenant, logout, hasPermission } = useAuth();
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
-  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
+  const sidebarOpen = useUIStore((s: any) => s.sidebarOpen);
+  const setSidebarOpen = useUIStore((s: any) => s.setSidebarOpen);
 
   useEffect(() => {
     const syncSidebarState = () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -333,27 +333,52 @@ export default function RateCalendarPage() {
   const [aiRates, setAiRates] = useState<Record<string, DayRate>>({});
   const token = useAuthStore((s) => s.accessToken);
   const isHydrated = useAuthStore((s) => s.isHydrated);
-  const { data: rooms, isLoading: roomsLoading } = useQuery<Room[]>({
+  const monthKey = format(currentMonth, 'yyyy-MM');
+  const roomRatesKey = ['room-rates', selectedRoom, monthKey] as const;
+
+  const { data: rooms = [] } = useQuery<Room[]>({
     queryKey: ['rooms'],
-    queryFn: () =>
-      api
-        .get('/api/rooms', {
-          params: { _t: Date.now() },
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
-            Expires: '0',
-          },
-        })
-        .then((r) => (r.data.data?.docs || r.data.data || []).filter((rm: any) => rm.isActive)),
-    enabled: isHydrated && !!token,
+    queryFn: async () => {
+      const res = await api.get('/api/rooms', {
+        withCredentials: true,
+        params: { t: Date.now() },
+      });
+      return (res.data?.data?.docs || res.data?.data || []).filter((rm: any) => rm.isActive);
+    },
+    enabled: isHydrated,
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   });
-  const monthKey = format(currentMonth, 'yyyy-MM');
-  const roomRatesKey = ['room-rates', selectedRoom, monthKey] as const;
+
+  const { data: rateData = [], isLoading: ratesLoading, refetch: refetchRates } = useQuery({
+    queryKey: ['room-rates', selectedRoom, monthKey],
+    queryFn: async () => {
+      const res = await api.get('/api/rooms/rates', {
+        withCredentials: true,
+        params: {
+          roomId: selectedRoom,
+          startDate: format(monthStart, 'yyyy-MM-dd'),
+          endDate: format(monthEnd, 'yyyy-MM-dd'),
+          t: Date.now(),
+        },
+      });
+      return res.data?.data || [];
+    },
+    enabled: isHydrated && !!selectedRoom,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+
+  useEffect(() => {
+    if (!selectedRoom && rooms?.length) {
+      setSelectedRoom(rooms[0]._id);
+    }
+  }, [rooms, selectedRoom]);
+
 
   const toDateKey = (value: string | Date) => {
     if (value instanceof Date) return format(value, 'yyyy-MM-dd');
@@ -362,43 +387,19 @@ export default function RateCalendarPage() {
   };
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-
-  const { data: rateData, isLoading: ratesLoading } = useQuery({
-    queryKey: roomRatesKey,
-    queryFn: async () => {
-      if (!selectedRoom) return [];
-      const res = await api.get('/api/rooms/rates', {
-        params: {
-          roomId: selectedRoom,
-          startDate: format(monthStart, 'yyyy-MM-dd'),
-          endDate: format(monthEnd, 'yyyy-MM-dd'),
-          _t: Date.now(),
-        },
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-          Expires: '0',
-        },
-      });
-      return res.data?.data || [];
-    },
-    enabled: isHydrated && !!token && !!selectedRoom,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-  });
+  const selectedRoomData = rooms?.find((r: any) => r._id === selectedRoom);
 
   const updateRateMutation = useMutation({
-    mutationFn: (d: { roomId: string; date: string; rate: number }) =>
-      api.post('/api/rooms/rates', d),
-
-    onSuccess: (_, vars) => {
+    mutationFn: (d: { roomId: string; date: string; rate: number; note?: string }) =>
+      api.patch(`/api/rooms/rates/${d.roomId}/${d.date}`, {
+        rate: d.rate,
+        note: d.note,
+      }),
+    onSuccess: async (_, vars) => {
       const key = toDateKey(vars.date);
 
-      qc.setQueryData(roomRatesKey, (old: DayRate[] = []) => {
+      qc.setQueryData(['room-rates', selectedRoom, monthKey], (old: DayRate[] = []) => {
         const exists = old.some((d) => toDateKey(d.date) === key);
-
         if (exists) {
           return old.map((d) =>
             toDateKey(d.date) === key
@@ -406,7 +407,7 @@ export default function RateCalendarPage() {
                 ...d,
                 date: key,
                 customRate: vars.rate,
-                baseRate: d.baseRate || selectedRoom_?.baseRate || vars.rate,
+                baseRate: d.baseRate ?? selectedRoomData?.baseRate ?? vars.rate,
               }
               : d
           );
@@ -416,19 +417,25 @@ export default function RateCalendarPage() {
           ...old,
           {
             date: key,
-            baseRate: selectedRoom_?.baseRate || vars.rate,
+            baseRate: selectedRoomData?.baseRate ?? vars.rate,
             customRate: vars.rate,
+            occupancyPct: 0,
+            reservations: 0,
           },
         ];
       });
 
-      qc.invalidateQueries({ queryKey: roomRatesKey, exact: true });
+      await qc.invalidateQueries({
+        queryKey: ['room-rates', selectedRoom, monthKey],
+        exact: true,
+      });
+
+      await refetchRates();
+
       toast.success('Rate updated');
       setEditModal(null);
       setNewRate('');
     },
-
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
   const bulkUpdateMutation = useMutation({
@@ -449,12 +456,12 @@ export default function RateCalendarPage() {
               ...next[idx],
               date: dateKey,
               customRate: vars.rate,
-              baseRate: next[idx].baseRate || selectedRoom_?.baseRate || vars.rate,
+              baseRate: next[idx].baseRate || selectedRoomData?.baseRate || vars.rate,
             };
           } else {
             next.push({
               date: dateKey,
-              baseRate: selectedRoom_?.baseRate || vars.rate,
+              baseRate: selectedRoomData?.baseRate || vars.rate,
               customRate: vars.rate,
             });
           }
@@ -544,7 +551,6 @@ export default function RateCalendarPage() {
     toast.success(`Applied ${suggestions.length} AI recommendations`);
   }
 
-  const selectedRoom_ = rooms?.find((r) => r._id === selectedRoom);
   const aiChanges = Object.values(aiRates).filter((d) => d.aiAction !== 'hold').length;
   const rateMap = useMemo<Record<string, DayRate>>(() => {
     const map: Record<string, DayRate> = {};
@@ -553,7 +559,7 @@ export default function RateCalendarPage() {
       const key = format(date, 'yyyy-MM-dd');
       map[key] = {
         date: key,
-        baseRate: selectedRoom_?.baseRate || 0,
+        baseRate: selectedRoomData?.baseRate || 0,
       };
     });
 
@@ -563,7 +569,7 @@ export default function RateCalendarPage() {
         ...map[key],
         ...d,
         date: key,
-        baseRate: d.baseRate || map[key]?.baseRate || selectedRoom_?.baseRate || 0,
+        baseRate: d.baseRate || map[key]?.baseRate || selectedRoomData?.baseRate || 0,
       };
     });
 
@@ -579,7 +585,7 @@ export default function RateCalendarPage() {
     });
 
     return map;
-  }, [days, rateData, aiRates, selectedRoom_?.baseRate]);
+  }, [days, rateData, aiRates, selectedRoomData?.baseRate]);
   const customDays = days.filter((d) => {
     const key = format(d, 'yyyy-MM-dd');
     return !!rateMap[key]?.customRate;
@@ -593,7 +599,7 @@ export default function RateCalendarPage() {
         return sum + (row?.customRate ?? row?.baseRate ?? 0);
       }, 0) / days.length
     )
-    : selectedRoom_?.baseRate || 0;
+    : selectedRoomData?.baseRate || 0;
 
   return (
     <DashboardLayout title="Rate Calendar">
@@ -674,7 +680,7 @@ export default function RateCalendarPage() {
                 }}
               >
                 <option value="">Select a room...</option>
-                {rooms?.map((r) => (
+                {rooms?.map((r: any) => (
                   <option key={r._id} value={r._id}>
                     Room {r.number} · {r.type} · {formatCurrency(r.baseRate)}/night
                   </option>
@@ -695,9 +701,9 @@ export default function RateCalendarPage() {
             </button>
           </div>
 
-          {selectedRoom_ && (
+          {selectedRoomData && (
             <div className="flex flex-wrap gap-3">
-              <GlassStat label="Base Rate" value={formatCurrency(selectedRoom_.baseRate)} icon={<BadgeIndianRupee className="w-4 h-4" />} />
+              <GlassStat label="Base Rate" value={formatCurrency(selectedRoomData.baseRate)} icon={<BadgeIndianRupee className="w-4 h-4" />} />
               <GlassStat label="Avg This Month" value={formatCurrency(avgRate)} icon={<BarChart3 className="w-4 h-4" />} />
               <GlassStat label="Custom Days" value={`${customDays} days`} icon={<Calendar className="w-4 h-4" />} />
               <GlassStat label="AI Changes" value={`${aiChanges} pending`} icon={<Sparkles className="w-4 h-4" />} highlight={aiChanges > 0} />
@@ -842,9 +848,9 @@ export default function RateCalendarPage() {
                           const dr = rateMap[format(d, 'yyyy-MM-dd')];
                           setEditModal({
                             date: d,
-                            currentRate: dr?.customRate ?? dr?.baseRate ?? selectedRoom_?.baseRate ?? 0,
+                            currentRate: dr?.customRate ?? dr?.baseRate ?? selectedRoomData?.baseRate ?? 0,
                           });
-                          setNewRate(String(dr?.customRate ?? dr?.baseRate ?? selectedRoom_?.baseRate ?? ''));
+                          setNewRate(String(dr?.customRate ?? dr?.baseRate ?? selectedRoomData?.baseRate ?? ''));
                         }}
                         isPast={isPast}
                         isToday={isToday}
