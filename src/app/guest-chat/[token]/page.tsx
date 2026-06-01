@@ -24,7 +24,7 @@ interface ApiMessage {
 }
 
 // ── Add this new interface above Message ──
-interface MessageAction {
+export interface MessageAction {
   type: string;
   title?: string;
   options?: Array<{
@@ -39,7 +39,7 @@ interface MessageAction {
   note?: string;
 }
 
-interface Message {
+export interface Message {
   id: string;
   role: MessageRole;
   text: string;
@@ -108,7 +108,6 @@ interface GuestAccessResponseData {
 }
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-const SOCKET_URL = (process.env.NEXT_PUBLIC_WS_URL || API_URL).replace(/\/$/, '');
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic'];
 
@@ -180,7 +179,7 @@ function toMessage(m: ApiMessage): Message {
 }
 
 // ── FIX #2: apiFetch with guaranteed Content-Type + better error body ─────────
-async function apiFetch<T = any>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T = any>(path: string, init?: RequestInit): Promise<T> {
   if (!API_URL) throw new Error('NEXT_PUBLIC_API_URL is not configured');
 
   // Ensure path starts with /
@@ -205,6 +204,7 @@ async function apiFetch<T = any>(path: string, init?: RequestInit): Promise<T> {
 function useGuestAccess(token: string) {
   const [loading, setLoading] = useState(true);
   const [expired, setExpired] = useState(false);
+  const [error, setError] = useState('');
   const [conversationId, setConversationId] = useState('');
   const [hotelName, setHotelName] = useState('Hotel');
   const [roomNumber, setRoomNumber] = useState('');
@@ -219,6 +219,7 @@ function useGuestAccess(token: string) {
     }
 
     setLoading(true);
+    setError('');
 
     try {
       const json = await apiFetch<{ success: boolean; data: GuestAccessResponseData }>(
@@ -237,12 +238,17 @@ function useGuestAccess(token: string) {
       setRoomNumber(data.roomNumber || data.reservation?.roomNumber || conversation.roomNumber || '');
       setGuestName(
         data.guest?.name ||
-        [data.guest?.firstName, data.guest?.lastName].filter(Boolean).join(' ') ||
-        'Guest'
+          [data.guest?.firstName, data.guest?.lastName].filter(Boolean).join(' ') ||
+          'Guest'
       );
       setMessages(Array.isArray(data.messages) ? data.messages.map(toMessage) : []);
     } catch (err: any) {
-      if (/expired|invalid|401/i.test(String(err?.message || ''))) setExpired(true);
+      const msg = String(err?.message || '');
+      if (/expired|invalid|401/i.test(msg)) {
+        setExpired(true);
+      } else {
+        setError(msg || 'Unable to load guest chat');
+      }
     } finally {
       setLoading(false);
     }
@@ -255,17 +261,19 @@ function useGuestAccess(token: string) {
   return {
     loading,
     expired,
+    error,
     conversationId,
     hotelName,
     roomNumber,
     guestName,
     messages,
     setMessages,
+    reloadAccess: load,
   };
 }
 
 // ─── REPLACE entire useGuestPolling ──────────────────────────────────────────
-function useGuestPolling(
+export function useGuestPolling(
   token: string,
   conversationId: string | undefined,
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
@@ -988,8 +996,8 @@ function MessageBubble({
             message.orderCard
               ? { background: 'transparent' }
               : guest
-              ? { background: theme.bubble, color: '#fff', borderBottomRightRadius: 8 }
-              : {
+                ? { background: theme.bubble, color: '#fff', borderBottomRightRadius: 8 }
+                : {
                   background: 'rgba(255,255,255,0.92)',
                   color: theme.text,
                   border: `1px solid ${theme.border}`,
@@ -1271,13 +1279,9 @@ export default function GuestChatPage({
       { id: tempId, role: 'guest', text, timestamp: new Date(), type: 'text', status: 'sending' },
     ]);
     try {
-      const res = await apiFetch('/api/chatbot/guest/message', {
+      const res = await apiFetch<any>('/api/chatbot/guest/message', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ token, text }),
       });
       // FIX: _id first (MongoDB), then id, then fallback
       const savedId = res?.data?.message?._id ?? res?.data?.message?.id ?? tempId;
