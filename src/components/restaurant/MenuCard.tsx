@@ -4,8 +4,27 @@ import { MenuItem } from '@/app/data/menuPresets';
 import { cn } from '@/lib/utils';
 import { Clock, Plus, Minus, Star, Flame, Users, ChefHat, TrendingUp } from 'lucide-react';
 
+// Support both internal `MenuItem` and API-shaped menu items (prepTime, _id)
+type ApiMenuItem = Partial<{
+  _id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  category: string;
+  isVeg: boolean;
+  imageUrl: string | null;
+  isPopular: boolean;
+  isChefSpecial: boolean;
+  spiceLevel: 'mild' | 'medium' | 'hot';
+  serves: string | null;
+  calories: number | null;
+  rating: number | null;
+  prepTime: string | null;
+  preparationTime: number | null;
+}>;
+
 interface Props {
-  item: MenuItem;
+  item: MenuItem & ApiMenuItem;
   quantity: number;
   onAdd: () => void;
   onRemove: () => void;
@@ -19,7 +38,8 @@ const SPICE_CONFIG = {
 
 export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
   const isSelected = quantity > 0;
-  const spice = item.spiceLevel ? SPICE_CONFIG[item.spiceLevel] : null;
+  const spice = item.spiceLevel ? SPICE_CONFIG[item.spiceLevel as keyof typeof SPICE_CONFIG] : null;
+  const prepLabel = (item as any).prepTime ?? (item.preparationTime ? `${item.preparationTime}m` : null);
 
   return (
     <div
@@ -121,10 +141,10 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
 
         {/* Meta chips row */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {item.preparationTime && (
+          {prepLabel && (
             <span className="inline-flex items-center gap-0.5 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
               <Clock className="h-2.5 w-2.5" />
-              {item.preparationTime}m
+              {prepLabel}
             </span>
           )}
 

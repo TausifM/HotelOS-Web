@@ -1,6 +1,7 @@
 'use client';
 
 import CheckoutOverdueCard from '@/components/guest-chat/CheckoutOverdueCard';
+import { MenuItemCard } from '@/components/restaurant/MenuCard';
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type MessageRole = 'guest' | 'bot' | 'staff';
@@ -686,152 +687,15 @@ function MenuSheet({
                     {list.map((item, idx) => {
                       const key = item._id || `${category}-${idx}-${item.name}`;
                       const qty = qtyMap[key] || 0;
-                      const note = noteMap[key] || '';
 
                       return (
-                        <article
+                        <MenuItemCard
                           key={key}
-                          className="group overflow-hidden rounded-[28px] border bg-white transition duration-300 hover:-translate-y-1"
-                          style={{
-                            borderColor: '#efd7cf',
-                            boxShadow: '0 12px 30px rgba(243, 129, 96, 0.08)',
-                          }}
-                        >
-                          <div className="relative">
-                            <div className="aspect-[16/10] w-full overflow-hidden bg-gradient-to-br from-orange-50 to-rose-50">
-                              {item.imageUrl ? (
-                                <img
-                                  src={item.imageUrl}
-                                  alt={item.name}
-                                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                                />
-                              ) : (
-                                <div className="flex h-full items-center justify-center text-sm font-medium" style={{ color: theme.faint }}>
-                                  No image available
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-                              <span
-                                className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                                style={{
-                                  background: item.isVeg ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                                  color: item.isVeg ? '#15803d' : '#b91c1c',
-                                }}
-                              >
-                                {item.isVeg ? 'VEG' : 'NON-VEG'}
-                              </span>
-
-                              {item.isPopular ? (
-                                <span className="rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-semibold text-orange-700">
-                                  Best seller
-                                </span>
-                              ) : null}
-
-                              {item.isChefSpecial ? (
-                                <span className="rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-semibold text-pink-700">
-                                  Chef’s pick
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div className="p-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <h5 className="truncate text-base font-semibold" style={{ color: theme.text }}>
-                                  {item.name}
-                                </h5>
-                                {item.description ? (
-                                  <p className="mt-1 line-clamp-2 text-sm leading-5" style={{ color: theme.muted }}>
-                                    {item.description}
-                                  </p>
-                                ) : null}
-                              </div>
-
-                              <div className="shrink-0 text-right">
-                                <div className="text-lg font-semibold" style={{ color: theme.orangeDark }}>
-                                  ₹{Number(item.price || 0).toLocaleString('en-IN')}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap items-center gap-2">
-                              {item.prepTime ? (
-                                <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: theme.border, color: theme.muted }}>
-                                  ⏱ {item.prepTime}
-                                </span>
-                              ) : null}
-
-                              {typeof item.rating === 'number' ? (
-                                <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: theme.border, color: theme.muted }}>
-                                  ★ {item.rating.toFixed(1)}
-                                </span>
-                              ) : null}
-
-                              {item.serves ? (
-                                <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium" style={{ borderColor: theme.border, color: theme.muted }}>
-                                  Serves {item.serves}
-                                </span>
-                              ) : null}
-
-                              {item.spiceLevel ? (
-                                <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize" style={{ borderColor: theme.border, color: theme.muted }}>
-                                  {item.spiceLevel}
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <div className="mt-4">
-                              <input
-                                value={note}
-                                onChange={(e) =>
-                                  setNoteMap((prev) => ({
-                                    ...prev,
-                                    [key]: e.target.value,
-                                  }))
-                                }
-                                placeholder="Add note: less spicy, no onion..."
-                                className="w-full rounded-2xl border px-3 py-2.5 text-sm outline-none"
-                                style={{ borderColor: theme.border, color: theme.text, background: '#fffaf8' }}
-                              />
-                            </div>
-
-                            <div className="mt-4 flex items-center justify-between gap-3">
-                              <div className="flex items-center rounded-full border p-1" style={{ borderColor: theme.border }}>
-                                <button
-                                  type="button"
-                                  onClick={() => setQty(key, qty - 1)}
-                                  className="h-9 w-9 rounded-full text-base font-semibold"
-                                  style={{ color: theme.text }}
-                                >
-                                  −
-                                </button>
-                                <span className="min-w-[2rem] text-center text-sm font-semibold" style={{ color: theme.text }}>
-                                  {qty}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setQty(key, qty + 1)}
-                                  className="h-9 w-9 rounded-full text-base font-semibold"
-                                  style={{ color: theme.text }}
-                                >
-                                  +
-                                </button>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => onOrderItem(item, Math.max(1, qty || 1), note)}
-                                className="rounded-full px-4 py-2.5 text-sm font-semibold text-white"
-                                style={{ background: theme.bubble }}
-                              >
-                                {qty > 0 ? `Add ${qty}` : 'Order now'}
-                              </button>
-                            </div>
-                          </div>
-                        </article>
+                          item={item as any}
+                          quantity={qty}
+                          onAdd={() => setQty(key, qty + 1)}
+                          onRemove={() => setQty(key, Math.max(0, qty - 1))}
+                        />
                       );
                     })}
                   </div>

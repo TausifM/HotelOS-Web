@@ -35,6 +35,7 @@ import {
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
+import { MenuItemCard } from '@/components/restaurant/MenuCard';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 type Room = {
@@ -538,6 +539,8 @@ function StaffOrderCardBubble({ action }: { action: ActionResult }) {
           </div>
         </div>
 
+        
+
         {statusMeta ? (
           <span
             className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]"
@@ -630,6 +633,23 @@ function StaffOrderCardBubble({ action }: { action: ActionResult }) {
 
 export default function GuestOperationsPage() {
   const qc = useQueryClient();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuLoading, setMenuLoading] = useState(false);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+
+  const fetchMenu = async () => {
+    setMenuLoading(true);
+    try {
+      const res = await api.get('/api/menu');
+      setMenuItems(res.data?.data?.items || []);
+      setMenuOpen(true);
+    } catch (e) {
+      console.warn('Menu fetch failed', e);
+    } finally {
+      setMenuLoading(false);
+    }
+  };
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
@@ -1159,6 +1179,13 @@ export default function GuestOperationsPage() {
               >
                 <RefreshCw className="h-4 w-4" />
                 Refresh
+              </button>
+              <button
+                onClick={() => fetchMenu()}
+                className="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold"
+                style={{ background: SURFACE, color: TEXT_SUB, border: `1.5px solid ${BORDER_MID}` }}
+              >
+                <UtensilsCrossed className="h-4 w-4" /> Menu
               </button>
 
               <button
