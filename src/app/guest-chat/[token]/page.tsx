@@ -273,7 +273,7 @@ function useGuestAccess(token: string) {
 }
 
 // ─── REPLACE entire useGuestPolling ──────────────────────────────────────────
-export function useGuestPolling(
+function useGuestPolling(
   token: string,
   conversationId: string | undefined,
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
