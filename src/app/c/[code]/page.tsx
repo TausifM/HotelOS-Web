@@ -1,35 +1,41 @@
-// src/app/c/[code]/page.tsx
 import { redirect } from 'next/navigation';
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
-type PageProps = {
-  params: {
-    code: string;
-  };
-};
+export default async function ShortGuestChatRedirect(
+  props: { params: Promise<{ code: string }> }
+) {
+  const { code } = await props.params;
 
-async function resolveCode(code: string) {
   const res = await fetch(
     `${API_URL}/api/chatbot/guest/resolve/${encodeURIComponent(code)}`,
     { cache: 'no-store' }
   );
 
   if (!res.ok) {
-    redirect('/404');
+    // TEMP: show plain text to debug; replace with redirect later
+    const text = await res.text();
+    return (
+      <html>
+        <body>
+          <pre>Resolve failed: {res.status} {res.statusText}{'\n'}{text}</pre>
+        </body>
+      </html>
+    );
   }
 
   const json = await res.json();
   const token = json?.data?.token as string | undefined;
 
   if (!token) {
-    redirect('/404');
+    return (
+      <html>
+        <body>
+          <pre>No token in response</pre>
+        </body>
+      </html>
+    );
   }
 
   redirect(`/guest-chat/${encodeURIComponent(token)}`);
-}
-
-export default async function ShortGuestChatRedirect({ params }: PageProps) {
-  await resolveCode(params.code);
-  return null;
 }
