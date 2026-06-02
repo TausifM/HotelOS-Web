@@ -296,8 +296,13 @@ function useGuestPolling(
   useEffect(() => {
     if (!token || !conversationId) return;
 
-    const interval = setInterval(async () => {
+    let mounted = true;
+
+    const poll = async () => {
+      if (!mounted) return;
       try {
+        if (typeof document !== 'undefined' && document.hidden) return; // pause when tab inactive
+
         const qs = lastSeenRef.current
           ? `?token=${encodeURIComponent(token)}&since=${encodeURIComponent(lastSeenRef.current)}`
           : `?token=${encodeURIComponent(token)}`;
@@ -364,9 +369,16 @@ function useGuestPolling(
       } catch {
         // silent
       }
-    }, 4000);
+    };
 
-    return () => clearInterval(interval);
+    // run once immediately, then poll regularly
+    poll();
+    const interval = setInterval(poll, 3000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, [token, conversationId, setMessages]);
 }
 
