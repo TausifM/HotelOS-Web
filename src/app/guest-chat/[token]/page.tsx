@@ -24,7 +24,7 @@ interface ApiMessage {
 }
 
 // ── Add this new interface above Message ──
-export interface MessageAction {
+interface MessageAction {
   type: string;
   title?: string;
   options?: Array<{
@@ -39,7 +39,7 @@ export interface MessageAction {
   note?: string;
 }
 
-export interface Message {
+interface Message {
   id: string;
   role: MessageRole;
   text: string;
@@ -179,7 +179,7 @@ function toMessage(m: ApiMessage): Message {
 }
 
 // ── FIX #2: apiFetch with guaranteed Content-Type + better error body ─────────
-export async function apiFetch<T = any>(path: string, init?: RequestInit): Promise<T> {
+async function apiFetch<T = any>(path: string, init?: RequestInit): Promise<T> {
   if (!API_URL) throw new Error('NEXT_PUBLIC_API_URL is not configured');
 
   // Ensure path starts with /
