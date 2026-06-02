@@ -654,12 +654,30 @@ function MenuSheet({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
           {loading ? (
-            <div className="py-16 text-center text-sm" style={{ color: theme.muted }}>
-              Loading menu...
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                <div className="mb-4 text-3xl">🍴</div>
+                <p className="text-sm font-medium" style={{ color: theme.muted }}>
+                  Loading menu...
+                </p>
+              </div>
+            </div>
+          ) : !items.length ? (
+            <div className="flex h-full items-center justify-center py-16">
+              <div className="mx-auto max-w-md rounded-[28px] border bg-white p-6 text-center" style={{ borderColor: theme.border }}>
+                <div className="mb-4 text-4xl">📋</div>
+                <h4 className="text-lg font-semibold" style={{ color: theme.text }}>
+                  Menu not available
+                </h4>
+                <p className="mt-2 text-sm" style={{ color: theme.muted }}>
+                  Sorry, the restaurant menu is currently unavailable. Please try again later or contact reception.
+                </p>
+              </div>
             </div>
           ) : !filtered.length ? (
-            <div className="py-16 text-center">
-              <div className="mx-auto max-w-md rounded-[28px] border bg-white p-6" style={{ borderColor: theme.border }}>
+            <div className="flex h-full items-center justify-center py-16">
+              <div className="mx-auto max-w-md rounded-[28px] border bg-white p-6 text-center" style={{ borderColor: theme.border }}>
+                <div className="mb-4 text-4xl">🔍</div>
                 <h4 className="text-lg font-semibold" style={{ color: theme.text }}>
                   No dishes match your filters
                 </h4>
@@ -683,19 +701,20 @@ function MenuSheet({
                     </div>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 w-full">
                     {list.map((item, idx) => {
                       const key = item._id || `${category}-${idx}-${item.name}`;
                       const qty = qtyMap[key] || 0;
 
                       return (
-                        <MenuItemCard
-                          key={key}
-                          item={item as any}
-                          quantity={qty}
-                          onAdd={() => setQty(key, qty + 1)}
-                          onRemove={() => setQty(key, Math.max(0, qty - 1))}
-                        />
+                        <div key={key} className="w-full h-full">
+                          <MenuItemCard
+                            item={item as any}
+                            quantity={qty}
+                            onAdd={() => setQty(key, qty + 1)}
+                            onRemove={() => setQty(key, Math.max(0, qty - 1))}
+                          />
+                        </div>
                       );
                     })}
                   </div>

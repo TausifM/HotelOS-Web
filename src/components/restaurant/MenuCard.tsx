@@ -49,6 +49,18 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
           ? 'border-primary bg-gradient-to-br from-primary/10 to-accent/5 shadow-glow'
           : 'border-border bg-card hover:border-primary/50 hover:-translate-y-0.5 hover:shadow-card'
       )}
+      style={{
+        ...(isSelected ? {
+          borderColor: '#ff7a45',
+          background: 'linear-gradient(135deg, rgba(255,122,69,0.1), rgba(244,63,94,0.05))',
+          boxShadow: '0 10px 25px rgba(255,122,69,0.15)',
+        } : {
+          borderColor: '#f0c8bf',
+          backgroundColor: '#fff',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+        }),
+        minWidth: '0',
+      }}
     >
       {/* ── Image area ──────────────────────────────────── */}
       {item.imageUrl ? (
@@ -61,7 +73,10 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
 
           {/* Qty badge top-right */}
           {isSelected && (
-            <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-primary-foreground shadow-glow">
+            <div 
+              className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold shadow-sm"
+              style={{ background: '#ff7a45', color: '#fff' }}
+            >
               ×{quantity}
             </div>
           )}
@@ -120,7 +135,7 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
           </div>
 
           {isSelected && (
-            <div className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground shadow-glow">
+            <div className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: '#ff7a45', color: '#fff' }}>
               ×{quantity}
             </div>
           )}
@@ -131,9 +146,9 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
       <div className="flex flex-1 flex-col gap-2 p-3">
         {/* Name + description */}
         <div>
-          <h4 className="truncate text-sm font-semibold text-foreground">{item.name}</h4>
+          <h4 className="truncate text-sm font-semibold" style={{ color: '#261815' }}>{item.name}</h4>
           {item.description && (
-            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed" style={{ color: '#7a5a53' }}>
               {item.description}
             </p>
           )}
@@ -142,21 +157,21 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
         {/* Meta chips row */}
         <div className="flex flex-wrap items-center gap-1.5">
           {prepLabel && (
-            <span className="inline-flex items-center gap-0.5 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ borderColor: '#f0c8bf', color: '#7a5a53' }}>
               <Clock className="h-2.5 w-2.5" />
               {prepLabel}
             </span>
           )}
 
           {typeof item.rating === 'number' && (
-            <span className="inline-flex items-center gap-0.5 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ borderColor: '#f0c8bf', color: '#7a5a53' }}>
               <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
               {item.rating.toFixed(1)}
             </span>
           )}
 
           {item.serves && (
-            <span className="inline-flex items-center gap-0.5 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ borderColor: '#f0c8bf', color: '#7a5a53' }}>
               <Users className="h-2.5 w-2.5" />
               {item.serves}
             </span>
@@ -173,7 +188,7 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
           )}
 
           {item.calories && (
-            <span className="inline-flex items-center gap-0.5 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium" style={{ borderColor: '#f0c8bf', color: '#7a5a53' }}>
               {item.calories} kcal
             </span>
           )}
@@ -181,22 +196,24 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
 
         {/* Price + stepper */}
         <div className="mt-auto flex items-center justify-between pt-1">
-          <p className="text-base font-bold text-gradient">₹{item.price}</p>
+          <p className="text-base font-bold" style={{ background: 'linear-gradient(135deg, #ff7a45, #f43f5e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>₹{item.price}</p>
 
           {isSelected ? (
-            <div className="flex items-center gap-1 rounded-xl bg-card/80 p-1 shadow-sm backdrop-blur">
+            <div className="flex items-center gap-1 rounded-xl p-1 transition" style={{ background: 'rgba(255,255,255,0.8)', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onRemove(); }}
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-foreground transition-smooth hover:bg-muted"
+                className="flex h-7 w-7 items-center justify-center rounded-lg transition hover:opacity-80"
+                style={{ background: '#f5f5f5', color: '#666' }}
               >
                 <Minus className="h-3.5 w-3.5" />
               </button>
-              <span className="min-w-[1.5rem] text-center text-sm font-bold">{quantity}</span>
+              <span className="min-w-[1.5rem] text-center text-sm font-bold" style={{ color: '#261815' }}>{quantity}</span>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onAdd(); }}
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-warm text-white shadow-sm transition-smooth hover:opacity-90"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-white transition hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, #ff7a45, #f43f5e)' }}
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
@@ -205,7 +222,8 @@ export function MenuItemCard({ item, quantity, onAdd, onRemove }: Props) {
             <button
               type="button"
               onClick={onAdd}
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-warm text-white shadow-sm transition-smooth hover:opacity-90 hover:shadow-glow"
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-white transition hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #ff7a45, #f43f5e)', boxShadow: '0 4px 12px rgba(255, 122, 69, 0.3)' }}
             >
               <Plus className="h-4 w-4" />
             </button>

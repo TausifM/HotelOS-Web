@@ -121,9 +121,24 @@ type StaffConversationListItem = {
   tags?: string[];
 };
 
+type MenuItemDetail = {
+  _id?: string;
+  id?: string;
+  name: string;
+  price: number;
+  quantity?: number;
+  imageUrl?: string;
+  description?: string;
+  category?: string;
+  isVeg?: boolean;
+  prepTime?: string;
+  rating?: number;
+};
+
 type ActionResult = {
   type: ActionType;
-  items?: string[];
+  items?: string[] | MenuItemDetail[];
+  menuItems?: MenuItemDetail[];
   summary?: string;
   issueTitle?: string;
   total?: number | string;
@@ -487,21 +502,37 @@ function StatCard({
 function StaffOrderCardBubble({ action }: { action: ActionResult }) {
   const actionMeta = action.type ? ACTION_META[action.type] : null;
   const statusMeta = action.status ? STATUS_META[action.status] : null;
+  const isRestaurantOrder = action.type === 'restaurantorder';
+  
+  // Support both string items and detailed MenuItemDetail objects
   const items = action.items || [];
+  const menuItems = action.menuItems || [];
+  const detailedItems = menuItems.length > 0 ? menuItems : (
+    Array.isArray(items) && items.length > 0 && typeof items[0] === 'object' 
+      ? (items as MenuItemDetail[]) 
+      : []
+  );
+  const stringItems = Array.isArray(items) && items.length > 0 && typeof items[0] === 'string' 
+    ? (items as string[]) 
+    : [];
+  
   const hasAmount = !!(action.total || action.amount);
   const ActionIcon = actionMeta?.icon;
+  const itemCount = detailedItems.length || stringItems.length;
 
   return (
     <div
-      className="overflow-hidden rounded-[22px] border"
+      className={cn(
+        'overflow-hidden rounded-[22px] border',
+        isRestaurantOrder ? 'w-full max-w-2xl' : 'max-w-[320px] min-w-[220px]'
+      )}
       style={{
         background: '#FFFFFF',
         borderColor: BORDER_MID,
         boxShadow: '0 8px 28px rgba(249,115,22,0.12)',
-        maxWidth: 320,
-        minWidth: 220,
       }}
     >
+      {/* Header */}
       <div
         className="flex items-center justify-between gap-3 px-4 py-3"
         style={{
@@ -531,15 +562,13 @@ function StaffOrderCardBubble({ action }: { action: ActionResult }) {
             >
               {actionMeta?.label || 'Service'}
             </p>
-            {items.length > 0 ? (
+            {itemCount > 0 ? (
               <p className="text-[10px]" style={{ color: TEXT_MUTED }}>
-                {items.length} item{items.length > 1 ? 's' : ''}
+                {itemCount} item{itemCount > 1 ? 's' : ''}
               </p>
             ) : null}
           </div>
         </div>
-
-        
 
         {statusMeta ? (
           <span
@@ -555,10 +584,105 @@ function StaffOrderCardBubble({ action }: { action: ActionResult }) {
         ) : null}
       </div>
 
-      <div className="space-y-2 px-4 py-3">
-        {items.length > 0 ? (
+      {/* Content */}
+      <div className="px-4 py-3">
+        {/* Detailed Menu Items (for restaurant orders) */}
+        {isRestaurantOrder && detailedItems.length > 0 ? (
+          <div className="space-y-3">
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+              {detailedItems.map((item, idx) => (
+                <div
+                  key={item._id || item.id || idx}
+                  className="overflow-hidden rounded-2xl border"
+                  style={{
+                    borderColor: BORDER,
+                    background: BG,
+                  }}
+                >
+                  {/* Item Image */}
+                  {item.imageUrl ? (
+                    <div className="aspect-[16/9] w-full overflow-hidden bg-gradient-to-br from-orange-50 to-rose-50">
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className="flex aspect-[16/9] w-full items-center justify-center text-3xl"
+                      style={{ background: 'linear-gradient(135deg,#fff4ec,#ffe8f4)' }}
+                    >
+                      🍽️
+                    </div>
+                  )}
+
+                  {/* Item Details */}
+                  <div className="p-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-bold" style={{ color: TEXT }}>
+                          {item.name}
+                        </p>
+                        {item.description ? (
+                          <p className="line-clamp-1 text-[10px]" style={{ color: TEXT_MUTED }}>
+                            {item.description}
+                          </p>
+                        ) : null}
+                      </div>
+                      {item.quantity ? (
+                        <span
+                          className="flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white"
+                          style={{ background: MELON }}
+                        >
+                          ×{item.quantity}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Meta info */}
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {item.prepTime ? (
+                        <span className="rounded-full px-1.5 py-0.5 text-[9px] font-medium" style={{ background: '#FFF0EA', color: '#EA5D28' }}>
+                          {item.prepTime}
+                        </span>
+                      ) : null}
+                      {item.category ? (
+                        <span className="rounded-full px-1.5 py-0.5 text-[9px] font-medium capitalize" style={{ background: '#F0F9FF', color: '#0284C7' }}>
+                          {item.category}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Price */}
+                    <div className="mt-2 flex items-center justify-between">
+                      <p className="text-sm font-bold" style={{ color: MELON }}>
+                        ₹{item.price}
+                      </p>
+                      {item.isVeg !== undefined ? (
+                        <span
+                          className="inline-flex h-4 w-4 items-center justify-center rounded-sm border text-[6px]"
+                          style={{
+                            borderColor: item.isVeg ? '#16a34a' : '#dc2626',
+                            background: item.isVeg ? '#f0fdf4' : '#fef2f2',
+                          }}
+                        >
+                          <div
+                            className="h-1 w-1 rounded-full"
+                            style={{ background: item.isVeg ? '#16a34a' : '#dc2626' }}
+                          />
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : stringItems.length > 0 ? (
+          /* Text Items (fallback for non-restaurant orders) */
           <div className="space-y-1.5">
-            {items.map((item, i) => (
+            {stringItems.map((item, i) => (
               <div key={i} className="flex items-start gap-2">
                 <span
                   className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full"
@@ -573,19 +697,19 @@ function StaffOrderCardBubble({ action }: { action: ActionResult }) {
         ) : null}
 
         {action.summary ? (
-          <p className="text-xs leading-5" style={{ color: TEXT_SUB }}>
+          <p className="mt-2 text-xs leading-5" style={{ color: TEXT_SUB }}>
             {action.summary}
           </p>
         ) : null}
 
         {action.issueTitle ? (
-          <p className="text-xs font-semibold" style={{ color: TEXT }}>
+          <p className="mt-2 text-xs font-semibold" style={{ color: TEXT }}>
             {action.issueTitle}
           </p>
         ) : null}
 
         {action.newCheckout ? (
-          <p className="text-xs" style={{ color: TEXT_SUB }}>
+          <p className="mt-2 text-xs" style={{ color: TEXT_SUB }}>
             New checkout:{' '}
             <span className="font-semibold" style={{ color: TEXT }}>
               {action.newCheckout}
@@ -593,7 +717,7 @@ function StaffOrderCardBubble({ action }: { action: ActionResult }) {
           </p>
         ) : null}
 
-        {hasAmount ? <div className="h-px" style={{ background: BORDER }} /> : null}
+        {hasAmount ? <div className="my-2 h-px" style={{ background: BORDER }} /> : null}
 
         {hasAmount ? (
           <div className="flex items-center justify-between">
@@ -619,7 +743,7 @@ function StaffOrderCardBubble({ action }: { action: ActionResult }) {
             href={action.paymentLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-semibold underline"
+            className="mt-2 flex items-center gap-1.5 text-xs font-semibold underline"
             style={{ color: SKY }}
           >
             <LinkIcon className="h-3 w-3" />
