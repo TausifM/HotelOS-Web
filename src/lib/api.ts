@@ -11,7 +11,7 @@ type RetryConfig = InternalAxiosRequestConfig & {
 
 const api: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 100000,
+  timeout: 30000,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -20,13 +20,11 @@ let refreshing = false;
 let queue: Array<{ resolve: () => void; reject: (err: unknown) => void }> = [];
 
 const flushQueue = (error?: unknown) => {
-  queue.forEach((p) => {
-    if (error) p.reject(error);
-    else p.resolve();
-  });
+  queue.forEach((p) => (error ? p.reject(error) : p.resolve()));
   queue = [];
 };
 
+// Force credentials on every request (belt & suspenders)
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   config.withCredentials = true;
   return config;
@@ -34,13 +32,11 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 api.interceptors.response.use(
   (res) => res,
-  async (error: AxiosError<any>) => {
+  async (error: AxiosError<{ message?: string }>) => {
     const original = error.config as RetryConfig | undefined;
     const status = error.response?.status;
 
-    if (!original) {
-      return Promise.reject(error);
-    }
+    if (!original) return Promise.reject(error);
 
     const url = original.url || '';
     const isAuthRoute =
@@ -48,18 +44,11 @@ api.interceptors.response.use(
       url.includes('/api/auth/refresh') ||
       url.includes('/api/auth/logout');
 
-    if (
-      status === 401 &&
-      !original._retry &&
-      !original._skipAuthRefresh &&
-      !isAuthRoute
-    ) {
+    // 401 on a non-auth route → try silent refresh
+    if (status === 401 && !original._retry && !original._skipAuthRefresh && !isAuthRoute) {
       if (refreshing) {
         return new Promise((resolve, reject) => {
-          queue.push({
-            resolve: () => resolve(api(original)),
-            reject,
-          });
+          queue.push({ resolve: () => resolve(api(original)), reject });
         });
       }
 
@@ -67,14 +56,11 @@ api.interceptors.response.use(
       refreshing = true;
 
       try {
-        await axios.post(
-          `${BASE_URL}/api/auth/refresh`,
-          {},
-          {
-            withCredentials: true,
-            timeout: 30000,
-          }
-        );
+        // Use a separate axios instance to avoid interceptor loops
+        await axios.post(`${BASE_URL}/api/auth/refresh`, {}, {
+          withCredentials: true,
+          timeout: 15000,
+        });
 
         flushQueue();
         return api(original);
@@ -88,15 +74,14 @@ api.interceptors.response.use(
             window.location.href = `/auth/login?next=${encodeURIComponent(next)}`;
           }
         }
-
         return Promise.reject(refreshError);
       } finally {
         refreshing = false;
       }
     }
 
+    // Don't toast on auth errors (handled by UI) or 404s
     const msg = error.response?.data?.message || 'Something went wrong';
-
     if (status !== 401 && status !== 404) {
       toast.error(msg);
     }
@@ -106,7 +91,7 @@ api.interceptors.response.use(
 );
 
 export const reportsApi = {
-  dashboard: (params?: Record<string, any>) =>
+  dashboard: (params?: Record<string, string | number | boolean>) =>
     api.get('/api/reports/dashboard', { params }),
   dailyBusiness: (date?: string) =>
     api.get('/api/reports/daily-business', { params: { date } }),
