@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+/* ------------------------------------------------------------------ */
+//  Types
+/* ------------------------------------------------------------------ */
+
 export interface StaffUser {
   id: string;
   name: string;
@@ -25,8 +29,11 @@ export interface TenantInfo {
 }
 
 interface AuthState {
+  // Tokens are kept in memory only — never persisted to localStorage.
+  // The backend uses HTTP-only cookies as the primary auth mechanism.
   accessToken: string | null;
   refreshToken: string | null;
+
   staff: StaffUser | null;
   tenant: TenantInfo | null;
   isAuthenticated: boolean;
@@ -44,18 +51,15 @@ interface AuthState {
     refreshToken?: string | null;
   }) => void;
 
-  login: (data: {
-    accessToken?: string | null;
-    refreshToken?: string | null;
-    staff: StaffUser;
-    tenant?: TenantInfo | null;
-  }) => void;
-
   clearSession: () => void;
   logout: () => void;
   updateToken: (token: string | null) => void;
   updateTenant: (tenant: Partial<TenantInfo>) => void;
 }
+
+/* ------------------------------------------------------------------ */
+//  Store
+/* ------------------------------------------------------------------ */
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -84,16 +88,6 @@ export const useAuthStore = create<AuthState>()(
           isSuperAdmin: staff.role === 'superadmin',
         })),
 
-      login: ({ accessToken = null, refreshToken = null, staff, tenant }) =>
-        set({
-          accessToken,
-          refreshToken,
-          staff,
-          tenant: tenant ?? null,
-          isAuthenticated: true,
-          isSuperAdmin: staff.role === 'superadmin',
-        }),
-
       clearSession: () =>
         set({
           accessToken: null,
@@ -104,7 +98,9 @@ export const useAuthStore = create<AuthState>()(
           isSuperAdmin: false,
         }),
 
-      logout: () =>
+      logout: () => {
+        // Optional: notify backend to clear HTTP-only cookies
+        // api.post('/api/auth/logout', {}, { withCredentials: true });
         set({
           accessToken: null,
           refreshToken: null,
@@ -112,7 +108,8 @@ export const useAuthStore = create<AuthState>()(
           tenant: null,
           isAuthenticated: false,
           isSuperAdmin: false,
-        }),
+        });
+      },
 
       updateToken: (accessToken) => set({ accessToken }),
 
@@ -123,9 +120,9 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'stayos-auth',
+      // SECURITY: Only persist non-sensitive identity data.
+      // Tokens must remain in HTTP-only cookies to prevent XSS theft.
       partialize: (s) => ({
-        accessToken: s.accessToken,
-        refreshToken: s.refreshToken,
         staff: s.staff,
         tenant: s.tenant,
         isAuthenticated: s.isAuthenticated,
@@ -137,6 +134,10 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+/* ------------------------------------------------------------------ */
+//  UI Store (unchanged)
+/* ------------------------------------------------------------------ */
 
 interface UIState {
   sidebarOpen: boolean;

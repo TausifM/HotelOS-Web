@@ -711,6 +711,9 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [qrData, setQrData] = useState<any>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
 
   const [chargeForm, setChargeForm] = useState({
@@ -910,6 +913,12 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
       toast.success('Folio settled');
       setShowSettleModal(false);
       setSettleForm({ mode: 'cash', reference: '', notes: '' });
+      // Trigger server-side invoice generation so GST invoice number is created in realtime
+      try {
+        await api.post(`/api/folios/${folioId}/generate-invoice`);
+      } catch (e) {
+        // non-fatal; invoice may be generated manually by user
+      }
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
@@ -988,6 +997,23 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
       toast.error('QR generation failed');
     }
   }
+
+  const uploadQr = useMutation({
+    mutationFn: (fd: FormData) =>
+      api.post(`/api/payments/upi-qr/${folioId}/upload`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }),
+    onSuccess: (res: any) => {
+      const d = res.data?.data || res.data;
+      setQrData(d || null);
+      setShowUploadModal(false);
+      setUploadFile(null);
+      setUploadPreview(null);
+      toast.success('UPI QR uploaded');
+      invalidateAll();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Upload failed'),
+  });
 
   async function sendPaymentLink() {
     try {
@@ -1104,6 +1130,9 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
               </Button>
               <Button size="sm" variant="secondary" icon={<QrCode className="h-3.5 w-3.5" />} onClick={loadQR}>
                 UPI QR
+              </Button>
+              <Button size="sm" variant="secondary" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setShowUploadModal(true)}>
+                Upload QR
               </Button>
               <Button size="sm" variant="secondary" icon={<Send className="h-3.5 w-3.5" />} onClick={sendPaymentLink}>
                 Send Link
@@ -1981,6 +2010,44 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
             <p className="text-xs text-slate-400">After payment, record it manually in the folio.</p>
           </div>
         ) : null}
+      </Modal>
+      <Modal open={showUploadModal} onClose={() => setShowUploadModal(false)} title="Upload UPI QR" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">Upload a UPI QR image to Cloudinary (backend will persist).</p>
+          <div className="flex flex-col items-center gap-2">
+            {uploadPreview ? (
+              <img src={uploadPreview} className="h-44 w-44 rounded-2xl border border-slate-200 object-contain" />
+            ) : (
+              <div className="h-44 w-44 rounded-2xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400">Preview</div>
+            )}
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                setUploadFile(f);
+                if (f) setUploadPreview(URL.createObjectURL(f));
+              }}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => setShowUploadModal(false)}>Cancel</Button>
+            <Button
+              type="button"
+              loading={uploadQr.isPending}
+              onClick={() => {
+                if (!uploadFile) return toast.error('Select an image');
+                const fd = new FormData();
+                fd.append('file', uploadFile);
+                uploadQr.mutate(fd);
+              }}
+            >
+              Upload
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

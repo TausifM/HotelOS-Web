@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -25,38 +25,46 @@ const TOKEN = {
 };
 
 export default function LoginPage() {
-  const router = useRouter();
+   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const setSession = useAuthStore((s: any) => s.setSession ?? s.login);
-  const setCheckingAuth = useAuthStore((s: any) => s.setCheckingAuth);
-  const setHydrated = useAuthStore((s: any) => s.setHydrated);
+  const setSession = useAuthStore((s) => s.setSession);
+  const setCheckingAuth = useAuthStore((s) => s.setCheckingAuth);
+  const setHydrated = useAuthStore((s) => s.setHydrated);
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
-  const f =
-    (k: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((p) => ({ ...p, [k]: e.target.value }));
+  const handleChange = useCallback(
+    (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    },
+    []
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (loading) return;
 
+    if (!form.email.trim() || !form.password) {
+      toast.error('Please enter both email and password');
+      return;
+    }
+
     setLoading(true);
-    setCheckingAuth?.(true);
+    setCheckingAuth(true);
 
     try {
+      // Backend sets HTTP-only cookie (stayos_access_token)
       await api.post(
         '/api/auth/login',
         {
-          email: form.email,
+          email: form.email.trim().toLowerCase(),
           password: form.password,
         },
         {
-          timeout: 50000,
+          timeout: 30000,
           withCredentials: true,
         }
       );
@@ -76,21 +84,22 @@ export default function LoginPage() {
         tenant: session.tenant ?? null,
       });
 
-      setHydrated?.();
+      setHydrated();
 
       toast.success(`Welcome back, ${session.staff.name}!`);
 
       const next = searchParams.get('next') || '/dashboard';
       router.replace(next);
       router.refresh();
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.message ||
-          err?.message ||
-          'Login failed'
-      );
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err as Error)?.message ||
+        'Login failed';
+      toast.error(message);
     } finally {
-      setCheckingAuth?.(false);
+      setCheckingAuth(false);
       setLoading(false);
     }
   }
@@ -316,7 +325,7 @@ export default function LoginPage() {
                   type="email"
                   placeholder="you@hotel.com"
                   value={form.email}
-                  onChange={f('email')}
+                  onChange={handleChange('email')}
                   required
                   className="w-full rounded-2xl px-4 py-3 text-sm outline-none transition-all"
                   style={{
@@ -355,7 +364,7 @@ export default function LoginPage() {
                     type={showPw ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={form.password}
-                    onChange={f('password')}
+                    onChange={handleChange('password')}
                     required
                     className="w-full rounded-2xl px-4 py-3 pr-11 text-sm outline-none transition-all"
                     style={{

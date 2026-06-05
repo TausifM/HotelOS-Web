@@ -324,6 +324,12 @@ export default function FolioDetailPage() {
       setShowSettle(false);
       setSettleForm({ mode: 'cash', reference: '', notes: '' });
       await refresh();
+      // trigger server-side invoice generation so gst invoice number is created
+      try {
+        await api.post(`/api/folios/${id}/generate-invoice`);
+      } catch (e) {
+        // ignore non-fatal
+      }
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
