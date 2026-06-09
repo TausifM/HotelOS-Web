@@ -1,20 +1,19 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth.store';
 import {
   Plus, BedDouble, Grid3X3, List, Search, Edit2, Trash2,
   Wifi, Wind, Tv, Coffee, Car, Dumbbell, Waves,
   ChevronDown, CheckCircle, Sparkles, X, RefreshCw,
-  Loader2, Users, Baby, Maximize2, Eye, Cigarette,
+  Loader2, Users, Baby, Eye, Cigarette,
   Accessibility, TrendingUp, Building2, Filter, IndianRupee,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { RoomCard } from '@/components/room-card/RoomCard';
-import { createPortal } from 'react-dom';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Room {
@@ -364,7 +363,12 @@ function RoomForm({ form, setForm }: { form: any; setForm: (f: any) => void }) {
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function RoomsPage() {
   const qc = useQueryClient();
-  const router = useRouter();
+  const isHydrated = useAuthStore((s) => s.isHydrated);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isCheckingAuth = useAuthStore((s) => s.isCheckingAuth);
+  const tenantId = useAuthStore((s) => s.tenant?.id);
+  const authReady = isHydrated && isAuthenticated && !isCheckingAuth;
+  const roomsQueryKey = ['rooms', tenantId ?? 'current'] as const;
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'floor'>('grid');
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -379,34 +383,42 @@ export default function RoomsPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   // ── Queries ────────────────────────────────────────────────────────────────
-  const { data: rooms, isLoading, refetch } = useQuery<Room[]>({
-    queryKey: ['rooms'],
-    queryFn: () => api.get('/api/rooms').then(r => r.data.data?.docs || r.data.data || []),
+  const { data: rooms, isLoading, isFetching, refetch } = useQuery<Room[]>({
+    queryKey: roomsQueryKey,
+    queryFn: () => api.get('/api/rooms', {
+      withCredentials: true,
+      params: { t: Date.now() },
+    }).then(r => r.data.data?.docs || r.data.data || []),
+    enabled: authReady,
+    staleTime: 0,
     refetchInterval: 30_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const createMutation = useMutation({
     mutationFn: (d: any) => api.post('/api/rooms', d),
-    onSuccess: () => { toast.success('Room created!'); qc.invalidateQueries({ queryKey: ['rooms']  });  qc.invalidateQueries({ queryKey: ['room-rates'] }); closeModal(); },
+    onSuccess: () => { toast.success('Room created!'); qc.invalidateQueries({ queryKey: roomsQueryKey }); qc.invalidateQueries({ queryKey: ['rooms'] }); qc.invalidateQueries({ queryKey: ['room-rates'] }); closeModal(); },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
   const updateMutation = useMutation({
     mutationFn: (d: any) => api.put(`/api/rooms/${editingRoom?._id}`, d),
-    onSuccess: () => { toast.success('Room updated!'); qc.invalidateQueries({ queryKey: ['rooms'] }); qc.invalidateQueries({ queryKey: ['room-rates'] }); closeModal(); },
+    onSuccess: () => { toast.success('Room updated!'); qc.invalidateQueries({ queryKey: roomsQueryKey }); qc.invalidateQueries({ queryKey: ['rooms'] }); qc.invalidateQueries({ queryKey: ['room-rates'] }); closeModal(); },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/rooms/${id}`),
-    onSuccess: () => { toast.success('Room deleted'); qc.invalidateQueries({ queryKey: ['rooms'] }); qc.invalidateQueries({ queryKey: ['room-rates'] }); },
+    onSuccess: () => { toast.success('Room deleted'); qc.invalidateQueries({ queryKey: roomsQueryKey }); qc.invalidateQueries({ queryKey: ['rooms'] }); qc.invalidateQueries({ queryKey: ['room-rates'] }); },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       api.patch(`/api/rooms/${id}/status`, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['rooms'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: roomsQueryKey }); qc.invalidateQueries({ queryKey: ['rooms'] }); },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
   });
 
@@ -415,6 +427,7 @@ export default function RoomsPage() {
       Promise.all(ids.map(id => api.put(`/api/rooms/${id}`, { baseRate: rate }))),
     onSuccess: () => {
       toast.success(`Rate updated for ${bulkSelected.length} rooms`);
+      qc.invalidateQueries({ queryKey: roomsQueryKey });
       qc.invalidateQueries({ queryKey: ['rooms'] });
       qc.invalidateQueries({ queryKey: ['room-rates'] });
       qc.invalidateQueries({ queryKey: ["housekeeping"]});

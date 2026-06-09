@@ -331,13 +331,16 @@ export default function RateCalendarPage() {
   const [bulkRate, setBulkRate] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiRates, setAiRates] = useState<Record<string, DayRate>>({});
-  const token = useAuthStore((s) => s.accessToken);
   const isHydrated = useAuthStore((s) => s.isHydrated);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isCheckingAuth = useAuthStore((s) => s.isCheckingAuth);
+  const tenantId = useAuthStore((s) => s.tenant?.id);
+  const authReady = isHydrated && isAuthenticated && !isCheckingAuth;
   const monthKey = format(currentMonth, 'yyyy-MM');
   const roomRatesKey = ['room-rates', selectedRoom, monthKey] as const;
 
-  const { data: rooms = [] } = useQuery<Room[]>({
-    queryKey: ['rooms'],
+  const { data: rooms = [], isLoading: roomsLoading, isFetching: roomsFetching } = useQuery<Room[]>({
+    queryKey: ['rooms', tenantId ?? 'current'],
     queryFn: async () => {
       const res = await api.get('/api/rooms', {
         withCredentials: true,
@@ -345,7 +348,7 @@ export default function RateCalendarPage() {
       });
       return (res.data?.data?.docs || res.data?.data || []).filter((rm: any) => rm.isActive);
     },
-    enabled: isHydrated,
+    enabled: authReady,
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
@@ -366,7 +369,7 @@ export default function RateCalendarPage() {
       });
       return res.data?.data || [];
     },
-    enabled: isHydrated && !!selectedRoom,
+    enabled: authReady && !!selectedRoom,
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
@@ -374,7 +377,12 @@ export default function RateCalendarPage() {
   });
 
   useEffect(() => {
-    if (!selectedRoom && rooms?.length) {
+    if (!rooms?.length) {
+      if (selectedRoom) setSelectedRoom('');
+      return;
+    }
+
+    if (!selectedRoom || !rooms.some((room) => room._id === selectedRoom)) {
       setSelectedRoom(rooms[0]._id);
     }
   }, [rooms, selectedRoom]);
@@ -671,6 +679,7 @@ export default function RateCalendarPage() {
                   setAiRates({});
                   setSelectedDates([]);
                 }}
+                disabled={!authReady || roomsLoading || roomsFetching}
                 className="min-w-[290px] rounded-2xl px-4 py-3 text-sm font-medium outline-none"
                 style={{
                   background: UI.surface,
@@ -679,7 +688,9 @@ export default function RateCalendarPage() {
                   boxShadow: '0 8px 24px rgba(28,10,2,0.04)',
                 }}
               >
-                <option value="">Select a room...</option>
+                <option value="">
+                  {!authReady || roomsLoading || roomsFetching ? 'Loading rooms...' : 'Select a room...'}
+                </option>
                 {rooms?.map((r: any) => (
                   <option key={r._id} value={r._id}>
                     Room {r.number} · {r.type} · {formatCurrency(r.baseRate)}/night
@@ -782,7 +793,13 @@ export default function RateCalendarPage() {
               </div>
             </CardHeader>
 
-            {!selectedRoom ? (
+            {!authReady || roomsLoading || roomsFetching ? (
+              <CardContent>
+                <div className="flex justify-center py-16">
+                  <Spinner size="lg" />
+                </div>
+              </CardContent>
+            ) : !selectedRoom ? (
               <CardContent>
                 <div className="text-center py-20">
                   <div
