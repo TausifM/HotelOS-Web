@@ -2,7 +2,8 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/auth.store';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const SERVER_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const BASE_URL = typeof window === 'undefined' ? SERVER_API_URL : '';
 
 type RetryConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
