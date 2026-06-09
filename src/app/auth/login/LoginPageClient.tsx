@@ -24,6 +24,18 @@ const TOKEN = {
   melonLight: '#FED7AA',
 };
 
+const getPostLoginRedirect = (next: string | null) => {
+  if (!next || next === '/' || next.startsWith('/auth/')) {
+    return '/dashboard';
+  }
+
+  if (!next.startsWith('/') || next.startsWith('//')) {
+    return '/dashboard';
+  }
+
+  return next;
+};
+
 export default function LoginPage() {
    const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,8 +100,7 @@ export default function LoginPage() {
 
       toast.success(`Welcome back, ${session.staff.name}!`);
 
-      const next = searchParams.get('next') || '/dashboard';
-      router.replace(next);
+      router.replace(getPostLoginRedirect(searchParams.get('next')));
       router.refresh();
     } catch (err: unknown) {
       const message =
