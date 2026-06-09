@@ -411,14 +411,22 @@ const {
     <DashboardLayout title="Inventory">
       <div className="max-w-7xl space-y-6 rounded-[32px] bg-gradient-to-br from-orange-50/70 via-white to-pink-50/60 p-1">
         {/* Hero */}
-        <div className="overflow-hidden rounded-[30px] border border-orange-200 bg-gradient-to-r from-orange-500 via-pink-500 to-fuchsia-500 px-6 py-6 text-white shadow-lg">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        <div
+          className="rounded-[30px] p-6 md:p-7 overflow-hidden relative text-white"
+          style={{ background: 'linear-gradient(135deg,#F97316 0%,#F43F5E 100%)' }}>
+
+          <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full opacity-20"
+            style={{ background: 'rgba(255,255,255,0.3)' }} />
+          <div className="pointer-events-none absolute -bottom-6 left-20 h-28 w-28 rounded-full opacity-10"
+            style={{ background: 'rgba(255,255,255,0.5)' }} />          
+            
+            <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5" />
                 Hotel Store Control
               </div>
-              <h1 className="text-2xl font-black tracking-tight">Inventory Management</h1>
+               <h1 className="text-2xl font-bold sm:text-3xl leading-tight">Inventory Management</h1>
               <p className="mt-1 text-sm text-white/85">
                 {all.length} items · {lowCount} low stock · {outCount} out of stock · real-time stock actions
               </p>

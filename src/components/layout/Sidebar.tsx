@@ -56,7 +56,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     label: "Hotel",
     items: [
       { href: "/dashboard/rooms", label: "Rooms", icon: BedDouble, permission: "rooms.read" },
-      { href: "/dashboard/rate-calendar", label: "Rate Calendar", icon: CalendarRange, permission: "rates.read" },
+      { href: "/dashboard/rate-calendar", label: "Rate Calendar", icon: CalendarRange, permission: "rates.read", badge: "AI" },
       { href: "/dashboard/housekeeping", label: "Housekeeping", icon: Home, permission: "housekeeping.read" },
       { href: "/dashboard/maintenance", label: "Maintenance", icon: Wrench, permission: null },
       { href: "/dashboard/restaurant", label: "Restaurant", icon: ChefHat, permission: null },
@@ -72,8 +72,8 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       },
       { href: "/dashboard/banquet-management", label: "Banquet Management", icon: CalendarRange, permission: null, badge: "NEW" },
       { href: "/dashboard/audit", label: "Audit Logs", icon: ClipboardList, permission: "audits.read" },
-      { href: "/dashboard/attendance", label: "Staff Attendance", icon: CalendarDays, permission: "attendance.read" },
-      { href: "/dashboard/guest-operations", label: "Guest Chat", icon: CalendarDays, permission: "attendance.read" },
+      { href: "/dashboard/attendance", label: "Staff Attendance", icon: CalendarDays, permission: "attendance.read", badge: "NEW" },
+      { href: "/dashboard/guest-operations", label: "Guest Chat", icon: CalendarDays, permission: "attendance.read", badge: "AI"},
     ],
   },
   {
@@ -89,8 +89,8 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     label: "Engagement",
     items: [
       { href: "/dashboard/notifications", label: "Notifications", icon: Bell, permission: "notifications.read" },
-      { href: "/dashboard/loyalty", label: "Loyalty", icon: Star, permission: "loyalty.read" },
-      { href: "/dashboard/aifeatures", label: "AI Tools", icon: Bot, permission: null, badge: "NEW" },
+      { href: "/dashboard/loyalty", label: "Loyalty", icon: Star, permission: "loyalty.read", badge: "AI"},
+      { href: "/dashboard/aifeatures", label: "AI Tools", icon: Bot, permission: null, badge: "AI" },
       { href: "/dashboard/walkin", label: "Self Check-in", icon: Sparkles, permission: null, badge: "NEW" },
     ],
   },

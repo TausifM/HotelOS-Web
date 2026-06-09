@@ -70,7 +70,7 @@ const UI = {
   border: '#F0E4D8',
   borderMid: '#E5CDB8',
   text: '#1C0A02',
-  textSub: '#6B4535',
+  textSub: '#B9A79A',
   textMuted: '#A8836C',
   melonPale: '#FFF3E6',
   melonLight: '#FED7AA',
@@ -613,21 +613,13 @@ export default function RateCalendarPage() {
     <DashboardLayout title="Rate Calendar">
       <div className="max-w-7xl mx-auto space-y-6" style={{ color: UI.text }}>
         <div
-          className="rounded-[30px] p-6 md:p-7 overflow-hidden relative"
-          style={{
-            background: 'linear-gradient(135deg, #FFF9F4 0%, #FFF4EC 52%, #FFF9F6 100%)',
-            border: `1.5px solid ${UI.border}`,
-            boxShadow: '0 20px 60px rgba(249,115,22,0.08)',
-          }}
-        >
-          <div
-            className="absolute -top-14 -right-12 w-48 h-48 rounded-full blur-3xl"
-            style={{ background: 'rgba(249,115,22,0.10)' }}
-          />
-          <div
-            className="absolute -bottom-12 left-10 w-44 h-44 rounded-full blur-3xl"
-            style={{ background: 'rgba(244,63,94,0.08)' }}
-          />
+          className="rounded-[30px] p-6 md:p-7 overflow-hidden relative text-white"
+          style={{ background: 'linear-gradient(135deg,#F97316 0%,#F43F5E 100%)' }}>
+
+          <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full opacity-20"
+            style={{ background: 'rgba(255,255,255,0.3)' }} />
+          <div className="pointer-events-none absolute -bottom-6 left-20 h-28 w-28 rounded-full opacity-10"
+            style={{ background: 'rgba(255,255,255,0.5)' }} />
 
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
             <div>
@@ -645,8 +637,8 @@ export default function RateCalendarPage() {
                 </span>
               </div>
 
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight">Rate Calendar</h1>
-              <p className="text-sm mt-2 max-w-2xl" style={{ color: UI.textSub }}>
+              <h1 className="text-2xl font-bold sm:text-3xl leading-tight">Rate Calendar</h1>
+              <p className="text-sm mt-2 max-w-2xl opacity-80">
                 Manage custom room pricing date by date, compare against AI recommendations,
                 and push bulk rate updates with a cleaner visual calendar.
               </p>

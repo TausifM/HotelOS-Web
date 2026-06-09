@@ -447,14 +447,21 @@ export default function MaintenancePage() {
   return (
     <DashboardLayout title="Maintenance">
       <div className="space-y-6">
-        <div className="overflow-hidden rounded-[30px] border border-orange-200/60 bg-gradient-to-r from-orange-500 via-pink-500 to-fuchsia-500 text-white shadow-[0_25px_80px_-32px_rgba(236,72,153,0.55)]">
-          <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-6 md:px-8">
+            <div
+          className="rounded-[30px] p-6 md:p-7 overflow-hidden relative text-white"
+          style={{ background: 'linear-gradient(135deg,#F97316 0%,#F43F5E 100%)' }}>
+
+          <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full opacity-20"
+            style={{ background: 'rgba(255,255,255,0.3)' }} />
+          <div className="pointer-events-none absolute -bottom-6 left-20 h-28 w-28 rounded-full opacity-10"
+            style={{ background: 'rgba(255,255,255,0.5)' }} />
+          <div className="flex flex-wrap items-start justify-between">
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur">
                 <Sparkles className="h-3.5 w-3.5" />
                 Smart Maintenance Desk
               </div>
-              <h1 className="text-2xl font-black tracking-tight md:text-3xl">Maintenance Management</h1>
+               <h1 className="text-2xl font-bold sm:text-3xl leading-tight">Maintenance Management</h1>
               <p className="mt-2 max-w-2xl text-sm text-white/85">
                 Track repairs, assign technicians, link guest-raised requests, schedule work, and close tickets with full visibility.
               </p>
