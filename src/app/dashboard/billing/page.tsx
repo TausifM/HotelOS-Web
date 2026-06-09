@@ -3,6 +3,7 @@
 import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Card,
   CardHeader,
@@ -56,6 +57,10 @@ import {
   Calendar,
   ChevronRight,
   Search,
+  MoreHorizontal,
+  ExternalLink,
+  FileWarning,
+  CheckCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
@@ -1487,8 +1492,8 @@ function FolioDetailPanel({ folioId }: { folioId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {folio.payments.map((p) => (
-                    <Tr key={p.id}>
+                  {folio.payments.map((p:any) => (
+                    <Tr key={p._id}>
                       <Td>
                         <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
                           {PAYMENT_MODE_LABELS[p.mode] || p.mode}
@@ -2073,8 +2078,11 @@ function PaymentMode({ label, value }: { label: string; value?: number }) {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   GUEST BILLING SUMMARY — Full Actions Edition
+   ═══════════════════════════════════════════════════════════════════════════ */
 function SettledGuestsTable() {
- const today = new Date();
+  const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
     .toISOString()
     .slice(0, 10);
@@ -2082,8 +2090,22 @@ function SettledGuestsTable() {
 
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(todayStr);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'settled' | 'open'>('all');
 
-  const { data, isLoading } = useQuery({
+  /* ─── Modals ─── */
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailTarget, setEmailTarget] = useState<{ folioId: string; email: string } | null>(null);
+  const [creditModalOpen, setCreditModalOpen] = useState(false);
+  const [creditTarget, setCreditTarget] = useState<{ folioId: string; folioNumber: string } | null>(null);
+  const [creditReason, setCreditReason] = useState('');
+  const [validateModalOpen, setValidateModalOpen] = useState(false);
+  const [validateResult, setValidateResult] = useState<any>(null);
+  const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
+
+  const qc = useQueryClient();
+
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['folio-summary-range', startDate, endDate],
     queryFn: () =>
       api
@@ -2093,133 +2115,654 @@ function SettledGuestsTable() {
         .then((r) => r.data.data),
   });
 
-  return (
-    <Card className="overflow-hidden border-white/60 bg-white/85 shadow-xl backdrop-blur">
-      <CardHeader className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SectionTitle
-            title="Guest Billing Summary"
-            subtitle="Summary by selected date range"
-          />
+  /* ─── Mutations ─── */
+  const generateInvoice = useMutation({
+    mutationFn: (folioId: string) =>
+      api.post(`/api/folios/${folioId}/generate-invoice`, {}, { responseType: 'blob' }),
+    onSuccess: (res, folioId) => {
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${folioId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Invoice PDF downloaded');
+    },
+    onError: () => toast.error('Invoice generation failed'),
+  });
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="w-44">
-              <Input
-                label="From"
-                type="date"
-                value={startDate}
-                max={endDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+  const emailInvoice = useMutation({
+    mutationFn: ({ folioId, email }: { folioId: string; email: string }) =>
+      api.post(`/api/folios/${folioId}/email-invoice`, { email }),
+    onSuccess: () => {
+      toast.success('Invoice emailed successfully');
+      setEmailModalOpen(false);
+      setEmailTarget(null);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Email failed'),
+  });
+
+  const generateCreditNote = useMutation({
+    mutationFn: ({ folioId, reason }: { folioId: string; reason: string }) =>
+      api.post(`/api/folios/${folioId}/generate-credit-note`, { reason }),
+    onSuccess: (res) => {
+      toast.success(`Credit note ${res.data.data.creditNoteNo} generated`);
+      setCreditModalOpen(false);
+      setCreditTarget(null);
+      setCreditReason('');
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Credit note failed'),
+  });
+
+  const runValidate = useMutation({
+    mutationFn: (folioId: string) =>
+      api.post(`/api/folios/${folioId}/checkout-validate`).then((r) => r.data.data),
+    onSuccess: (data) => {
+      setValidateResult(data);
+      setValidateModalOpen(true);
+    },
+    onError: () => toast.error('Validation failed'),
+  });
+
+  const closeFolio = useMutation({
+    mutationFn: (folioId: string) => api.post(`/api/folios/${folioId}/close`),
+    onSuccess: () => {
+      toast.success('Folio closed');
+      refetch();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Close failed'),
+  });
+
+  const postRoomCharges = useMutation({
+    mutationFn: (folioId: string) => api.post(`/api/folios/${folioId}/post-room-charges`),
+    onSuccess: () => {
+      toast.success('Room charges posted');
+      refetch();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
+  });
+
+  const postRestaurantCharges = useMutation({
+    mutationFn: (folioId: string) => api.post(`/api/folios/${folioId}/post-restaurant-charges`),
+    onSuccess: () => {
+      toast.success('Restaurant charges posted');
+      refetch();
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed'),
+  });
+
+  /* ─── Filtering ─── */
+  const filteredRows = useMemo(() => {
+    if (!data?.rows) return [];
+    let rows = data.rows;
+
+    if (statusFilter !== 'all') {
+      rows = rows.filter((r: any) => (statusFilter === 'settled' ? r.settled : !r.settled));
+    }
+
+    if (searchQuery.trim()) {
+      const term = searchQuery.toLowerCase();
+      rows = rows.filter(
+        (r: any) =>
+          r.guestName?.toLowerCase().includes(term) ||
+          r.folioNumber?.toLowerCase().includes(term) ||
+          r.bookingRef?.toLowerCase().includes(term) ||
+          r.roomNumber?.toLowerCase().includes(term)
+      );
+    }
+
+    return rows;
+  }, [data, statusFilter, searchQuery]);
+
+  const totals = useMemo(() => {
+    return filteredRows.reduce(
+      (acc: any, r: any) => {
+        acc.totalCharges = (acc.totalCharges || 0) + Number(r.totalCharges || 0);
+        acc.totalPayments = (acc.totalPayments || 0) + Number(r.totalPayments || 0);
+        acc.totalBalance = (acc.totalBalance || 0) + Number(r.balance || 0);
+        return acc;
+      },
+      { totalCharges: 0, totalPayments: 0, totalBalance: 0 }
+    );
+  }, [filteredRows]);
+
+  /* ─── Helpers ─── */
+  function openEmailModal(folioId: string, defaultEmail: string) {
+    setEmailTarget({ folioId, email: defaultEmail || '' });
+    setEmailModalOpen(true);
+    setActionMenuOpen(null);
+  }
+
+  function openCreditModal(folioId: string, folioNumber: string) {
+    setCreditTarget({ folioId, folioNumber });
+    setCreditModalOpen(true);
+    setActionMenuOpen(null);
+  }
+
+  function openValidate(folioId: string) {
+    runValidate.mutate(folioId);
+    setActionMenuOpen(null);
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
+      className="w-full"
+    >
+      <div className="overflow-hidden rounded-3xl border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50">
+        {/* ═══ Header ═══ */}
+        <div className="relative overflow-hidden border-b border-slate-100  px-8 py-6"  style={{ background: 'linear-gradient(135deg,#F97316 0%,#F43F5E 100%)' }}>
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-orange-500/10 blur-3xl" />
+          <div className="absolute -bottom-16 left-20 h-48 w-48 rounded-full bg-pink-500/10 blur-3xl" />
+          
+          <div className="relative flex flex-wrap items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-pink-600 text-white shadow-lg shadow-orange-500/25">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white tracking-tight">Guest Billing Summary</h2>
+                <p className="text-sm text-slate-400 mt-0.5">Complete folio management with all actions</p>
+              </div>
             </div>
 
-            <div className="w-44">
-              <Input
-                label="To"
-                type="date"
-                value={endDate}
-                min={startDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 px-4 py-2">
+                <Calendar className="h-4 w-4 text-slate-400" />
+                <input
+                  type="date"
+                  value={startDate}
+                  max={endDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-transparent text-sm text-white outline-none w-32"
+                />
+                <span className="text-slate-500">→</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  min={startDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-transparent text-sm text-white outline-none w-32"
+                />
+              </div>
+              <button
+                onClick={() => refetch()}
+                className="flex items-center gap-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20 transition-all"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Refresh
+              </button>
             </div>
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-4 pt-4">
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Spinner />
+        {/* ═══ Stats Bar ═══ */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 divide-x divide-slate-100 border-b border-slate-100">
+          <div className="px-6 py-5 hover:bg-slate-50/80 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-2 w-2 rounded-full bg-blue-500" />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Total Charges</span>
+            </div>
+            <p className="text-2xl font-black text-slate-900 tracking-tight">{formatCurrency(totals.totalCharges)}</p>
+            <p className="text-xs text-slate-400 mt-1">{filteredRows.length} folios</p>
           </div>
-        ) : !data ? (
-          <EmptyState title="No summary data" />
+          <div className="px-6 py-5 hover:bg-emerald-50/40 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-600">Total Payments</span>
+            </div>
+            <p className="text-2xl font-black text-emerald-700 tracking-tight">{formatCurrency(totals.totalPayments)}</p>
+            <p className="text-xs text-emerald-500/70 mt-1">Collected</p>
+          </div>
+          <div className="px-6 py-5 hover:bg-rose-50/40 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-2 w-2 rounded-full bg-rose-500" />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-rose-600">Outstanding</span>
+            </div>
+            <p className="text-2xl font-black text-rose-700 tracking-tight">{formatCurrency(totals.totalBalance)}</p>
+            <p className="text-xs text-rose-500/70 mt-1">Still due</p>
+          </div>
+          <div className="px-6 py-5 hover:bg-orange-50/40 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-2 w-2 rounded-full bg-orange-500" />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-orange-600">Folios</span>
+            </div>
+            <p className="text-2xl font-black text-orange-700 tracking-tight">{filteredRows.length}</p>
+            <p className="text-xs text-orange-500/70 mt-1">In selected range</p>
+          </div>
+        </div>
+
+        {/* ═══ Toolbar ═══ */}
+        <div className="flex flex-wrap items-center gap-4 px-8 py-5 border-b border-slate-100 bg-slate-50/50">
+          <div className="relative flex-1 min-w-[300px] max-w-md">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search guest, folio, booking, room..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400 transition-all shadow-sm"
+            />
+          </div>
+          <div className="flex rounded-xl bg-white p-1 shadow-sm border border-slate-200">
+            {(['all', 'open', 'settled'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={cn(
+                  'px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all',
+                  statusFilter === s
+                    ? 'bg-slate-900 text-white shadow-md'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                )}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ═══ Wide Table ═══ */}
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-orange-500" />
+              <p className="text-sm text-slate-400 font-medium">Loading folios...</p>
+            </div>
+          </div>
+        ) : !filteredRows?.length ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="h-16 w-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+              <FileText className="h-8 w-8 text-slate-300" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">No folios found</h3>
+            <p className="text-sm text-slate-400 mt-1 max-w-sm">Adjust your date range or search filters to see billing results.</p>
+          </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">Total Charges</p>
-                <p className="mt-1 text-xl font-bold text-slate-900">
-                  {formatCurrency(data.totals?.totalCharges || 0)}
-                </p>
-              </div>
+          <div className="overflow-x-auto">
+            <table className="w-full h-full min-w-max table-fixed">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80">
+                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-slate-500">Folio</th>
+                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-slate-500">Guest</th>
+                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-slate-500">Booking</th>
+                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-slate-500">Room</th>
+                  <th className="px-6 py-4 text-right text-[11px] font-bold uppercase tracking-widest text-slate-500">Charges</th>
+                  <th className="px-6 py-4 text-right text-[11px] font-bold uppercase tracking-widest text-slate-500">Payments</th>
+                  <th className="px-6 py-4 text-right text-[11px] font-bold uppercase tracking-widest text-slate-500">Balance</th>
+                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-slate-500">Invoice</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-bold uppercase tracking-widest text-slate-500">Status</th>
+                  <th className="px-6 py-4 text-right text-[11px] font-bold uppercase tracking-widest text-slate-500">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredRows.map((row: any, index: number) => {
+                  const rowKey = String(row?.folioId || row?.folioNumber || `sum-${index}`);
+                  const hasInvoice = !!row.gstInvoiceNo;
+                  const isSettled = row.settled;
 
-              <div className="rounded-2xl bg-emerald-50 p-4">
-                <p className="text-xs text-emerald-600">Total Payments</p>
-                <p className="mt-1 text-xl font-bold text-emerald-700">
-                  {formatCurrency(data.totals?.totalPayments || 0)}
-                </p>
-              </div>
+                  return (
+                    <motion.tr
+                      key={rowKey}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.03, duration: 0.3 }}
+                      className="group hover:bg-orange-50/30 transition-colors duration-200"
+                    >
+                      {/* Folio */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center flex-shrink-0">
+                            <Receipt className="h-4 w-4 text-slate-500" />
+                          </div>
+                          <div>
+                            <div className="font-mono text-sm font-bold text-slate-900">{row.folioNumber || '-'}</div>
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{row.folioId?.slice(-8)}</div>
+                          </div>
+                        </div>
+                      </td>
 
-              <div className="rounded-2xl bg-rose-50 p-4">
-                <p className="text-xs text-rose-600">Outstanding</p>
-                <p className="mt-1 text-xl font-bold text-rose-700">
-                  {formatCurrency(data.totals?.totalBalance || 0)}
-                </p>
-              </div>
-            </div>
+                      {/* Guest */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-orange-100 to-pink-100 flex items-center justify-center text-xs font-bold text-orange-700 flex-shrink-0">
+                            {row.guestName?.charAt(0) || 'G'}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{row.guestName || '-'}</div>
+                            <div className="text-[11px] text-slate-400">{row.guestPhone}</div>
+                          </div>
+                        </div>
+                      </td>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-100">
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>Folio</Th>
-                    <Th>Guest</Th>
-                    <Th>Booking</Th>
-                    <Th>Room</Th>
-                    <Th>Charges</Th>
-                    <Th>Payments</Th>
-                    <Th>Balance</Th>
-                    <Th>Status</Th>
-                  </tr>
-                </thead>
+                      {/* Booking */}
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                          {row.bookingRef || '-'}
+                        </span>
+                      </td>
 
-                <tbody>
-                  {data.rows?.map((row: any, index: number) => {
-                    const rowKey = String(row?.folioId || row?.folioNumber || `sum-${index}`);
+                      {/* Room */}
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 border border-blue-100">
+                          <BedDouble className="h-3 w-3" />
+                          {row.roomNumber || '-'}
+                        </span>
+                      </td>
 
-                    return (
-                      <Tr key={rowKey}>
-                        <Td className="font-mono text-xs">{row.folioNumber || '-'}</Td>
-                        <Td className="text-sm">{row.guestName || '-'}</Td>
-                        <Td className="text-xs text-slate-500">{row.bookingRef || '-'}</Td>
-                        <Td>{row.roomNumber || '-'}</Td>
-                        <Td>{formatCurrency(row.totalCharges || 0)}</Td>
-                        <Td className="text-emerald-700">
-                          {formatCurrency(row.totalPayments || 0)}
-                        </Td>
-                        <Td
-                          className={cn(
-                            'font-semibold',
-                            row.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
-                          )}
-                        >
+                      {/* Charges */}
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-sm font-bold text-slate-900 tabular-nums">{formatCurrency(row.totalCharges || 0)}</span>
+                      </td>
+
+                      {/* Payments */}
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-sm font-bold text-emerald-700 tabular-nums">{formatCurrency(row.totalPayments || 0)}</span>
+                      </td>
+
+                      {/* Balance */}
+                      <td className="px-6 py-4 text-right">
+                        <span className={cn(
+                          'text-sm font-black tabular-nums',
+                          row.balance > 0 ? 'text-rose-600' : 'text-emerald-600'
+                        )}>
                           {formatCurrency(row.balance || 0)}
-                        </Td>
-                        <Td>
-                          {row.settled ? (
-                            <Badge variant="success">Settled</Badge>
-                          ) : (
-                            <Badge variant="danger">Open</Badge>
-                          )}
-                        </Td>
-                      </Tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-            </div>
-          </>
+                        </span>
+                      </td>
+
+                      {/* Invoice */}
+                      <td className="px-6 py-4">
+                        {hasInvoice ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1.5 text-[11px] font-bold text-purple-700 border border-purple-200">
+                            <FileText className="h-3 w-3" />
+                            {row.gstInvoiceNo}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 border border-amber-200">
+                            Pending
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-6 py-4 text-center">
+                        {isSettled ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Settled
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-700 border border-rose-200">
+                            <AlertCircle className="h-3 w-3" />
+                            Open
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-4 text-right">
+                        <div className="relative inline-block">
+                          <button
+                            onClick={() => setActionMenuOpen(actionMenuOpen === rowKey ? null : rowKey)}
+                            className={cn(
+                              "flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200",
+                              actionMenuOpen === rowKey
+                                ? "border-orange-400 bg-orange-50 text-orange-600 shadow-md"
+                                : "border-slate-200 bg-white text-slate-400 hover:border-orange-300 hover:text-orange-500 hover:bg-orange-50 hover:shadow-sm"
+                            )}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+
+                          <AnimatePresence>
+                            {actionMenuOpen === rowKey && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 8 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 8 }}
+                                transition={{ duration: 0.15, ease: "easeOut" }}
+                                className="absolute right-0 top-11 z-50 w-60 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-2xl shadow-slate-200/50"
+                              >
+                                {/* Invoice Section */}
+                                <div className="px-3 py-2">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Invoice</span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    generateInvoice.mutate(row.folioId);
+                                    setActionMenuOpen(null);
+                                  }}
+                                  disabled={generateInvoice.isPending}
+                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-700 transition-colors disabled:opacity-40"
+                                >
+                                  <div className="h-7 w-7 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                    <FileDown className="h-3.5 w-3.5 text-orange-600" />
+                                  </div>
+                                  {generateInvoice.isPending ? 'Generating...' : 'Download PDF'}
+                                </button>
+                                <button
+                                  onClick={() => openEmailModal(row.folioId, row.guestEmail || '')}
+                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-700 transition-colors"
+                                >
+                                  <div className="h-7 w-7 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                    <Mail className="h-3.5 w-3.5 text-orange-600" />
+                                  </div>
+                                  Email Invoice
+                                </button>
+                                {hasInvoice && (
+                                  <button
+                                    onClick={() => openCreditModal(row.folioId, row.folioNumber)}
+                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                                  >
+                                    <div className="h-7 w-7 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">
+                                      <FileWarning className="h-3.5 w-3.5 text-rose-600" />
+                                    </div>
+                                    Credit Note
+                                  </button>
+                                )}
+
+                                <div className="my-2 h-px bg-slate-100 mx-2" />
+
+                                {/* Folio Section */}
+                                <div className="px-3 py-2">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Folio</span>
+                                </div>
+                                <Link
+                                  href={`/dashboard/billing/${row.folioId}`}
+                                  onClick={() => setActionMenuOpen(null)}
+                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                >
+                                  <div className="h-7 w-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                    <ExternalLink className="h-3.5 w-3.5 text-blue-600" />
+                                  </div>
+                                  Open Folio Detail
+                                </Link>
+                                <button
+                                  onClick={() => openValidate(row.folioId)}
+                                  disabled={runValidate.isPending}
+                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors disabled:opacity-40"
+                                >
+                                  <div className="h-7 w-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                    <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
+                                  </div>
+                                  {runValidate.isPending ? 'Validating...' : 'Checkout Validate'}
+                                </button>
+                                {!isSettled && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        postRoomCharges.mutate(row.folioId);
+                                        setActionMenuOpen(null);
+                                      }}
+                                      disabled={postRoomCharges.isPending}
+                                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors disabled:opacity-40"
+                                    >
+                                      <div className="h-7 w-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                        <BedDouble className="h-3.5 w-3.5 text-blue-600" />
+                                      </div>
+                                      Post Room Charges
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        postRestaurantCharges.mutate(row.folioId);
+                                        setActionMenuOpen(null);
+                                      }}
+                                      disabled={postRestaurantCharges.isPending}
+                                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors disabled:opacity-40"
+                                    >
+                                      <div className="h-7 w-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                        <Utensils className="h-3.5 w-3.5 text-blue-600" />
+                                      </div>
+                                      Post F&B Charges
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (confirm('Close this folio? Balance must be zero.')) {
+                                          closeFolio.mutate(row.folioId);
+                                          setActionMenuOpen(null);
+                                        }
+                                      }}
+                                      disabled={closeFolio.isPending || row.balance > 0}
+                                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-30"
+                                    >
+                                      <div className="h-7 w-7 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                        <CheckCheck className="h-3.5 w-3.5 text-emerald-600" />
+                                      </div>
+                                      {closeFolio.isPending ? 'Closing...' : 'Close Folio'}
+                                    </button>
+                                  </>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-      </CardContent>
-    </Card>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-8 py-4 border-t border-slate-100 bg-slate-50/50">
+          <p className="text-xs text-slate-500">
+            Showing <span className="font-bold text-slate-900">{filteredRows.length}</span> of <span className="font-bold text-slate-900">{data?.rows?.length || 0}</span> folios
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="text-xs text-slate-500">Last updated: {formatDateTime(new Date())}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ Modals ═══ */}
+      <Modal open={emailModalOpen} onClose={() => setEmailModalOpen(false)} title="Email Invoice" size="sm">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!emailTarget?.email) return toast.error('Email required');
+            emailInvoice.mutate({ folioId: emailTarget.folioId, email: emailTarget.email });
+          }}
+        >
+          <Input
+            label="Recipient Email"
+            type="email"
+            value={emailTarget?.email || ''}
+            onChange={(e) => setEmailTarget((p) => (p ? { ...p, email: e.target.value } : null))}
+            placeholder="guest@example.com"
+            required
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => setEmailModalOpen(false)}>Cancel</Button>
+            <Button type="submit" loading={emailInvoice.isPending}>Send Invoice</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={creditModalOpen} onClose={() => setCreditModalOpen(false)} title="Generate Credit Note" size="sm">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!creditReason.trim()) return toast.error('Reason required');
+            if (!creditTarget) return;
+            generateCreditNote.mutate({ folioId: creditTarget.folioId, reason: creditReason });
+          }}
+        >
+          <div className="rounded-xl bg-rose-50 p-4 border border-rose-200">
+            <p className="text-xs font-bold uppercase tracking-wider text-rose-500 mb-1">Folio</p>
+            <p className="text-lg font-black text-rose-900">{creditTarget?.folioNumber}</p>
+          </div>
+          <Input
+            label="Credit Reason"
+            value={creditReason}
+            onChange={(e) => setCreditReason(e.target.value)}
+            placeholder="e.g. Billing error, guest complaint..."
+            required
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => setCreditModalOpen(false)}>Cancel</Button>
+            <Button type="submit" loading={generateCreditNote.isPending} variant="danger">Generate Credit Note</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={validateModalOpen} onClose={() => setValidateModalOpen(false)} title="Checkout Validation" size="sm">
+        {validateResult && (
+          <div className="space-y-4">
+            <div className={cn(
+              'rounded-2xl border p-5 flex items-start gap-4',
+              validateResult.valid ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'
+            )}>
+              {validateResult.valid ? (
+                <CheckCircle2 className="h-6 w-6 text-emerald-600 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="h-6 w-6 text-rose-600 flex-shrink-0" />
+              )}
+              <div>
+                <p className={cn('font-bold text-base', validateResult.valid ? 'text-emerald-900' : 'text-rose-900')}>
+                  {validateResult.valid ? 'Ready for Checkout' : 'Validation Issues Found'}
+                </p>
+                {!validateResult.valid && (
+                  <ul className="mt-3 list-disc space-y-1.5 pl-4 text-sm text-rose-700">
+                    {validateResult.issues?.map((issue: string, i: number) => (
+                      <li key={i}>{issue}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-white/70 p-3">
+                    <p className="text-xs text-slate-500 mb-1">Balance</p>
+                    <p className="text-sm font-bold text-slate-900">{formatCurrency(validateResult.balance)}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/70 p-3">
+                    <p className="text-xs text-slate-500 mb-1">Settled</p>
+                    <p className="text-sm font-bold text-slate-900">{validateResult.isSettled ? 'Yes' : 'No'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setValidateModalOpen(false)}>Close</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </motion.div>
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   BILLING PAGE — Updated with modern orange-pink light theme
+   ═══════════════════════════════════════════════════════════════════════════ */
 function BillingContent() {
   const searchParams = useSearchParams();
-  const [selectedFolioId, setSelectedFolioId] = useState<string | null>(
-    searchParams.get('folioId')
-  );
+  const [selectedFolioId, setSelectedFolioId] = useState<string | null>(searchParams.get('folioId'));
   const [showRecon, setShowRecon] = useState(false);
   const qc = useQueryClient();
 
@@ -2237,279 +2780,107 @@ function BillingContent() {
 
   return (
     <DashboardLayout title="Billing">
-      <div className="space-y-5 max-w-7xl pb-10">
-        <div
-          className="relative overflow-hidden rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 text-white shadow-xl"
-          style={{ background: 'linear-gradient(135deg,#F97316 0%,#F43F5E 100%)' }}
+      <div className="space-y-6 max-w-7xl pb-10">
+        {/* Hero */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-3xl  text-white p-8 shadow-xl shadow-orange-500/15"
+         style={{ background: 'linear-gradient(135deg,#F97316 0%,#F43F5E 100%)' }}
         >
-          <div
-            className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full opacity-20"
-            style={{ background: 'rgba(255,255,255,0.3)' }}
-          />
-          <div
-            className="pointer-events-none absolute -bottom-6 left-20 h-28 w-28 rounded-full opacity-10"
-            style={{ background: 'rgba(255,255,255,0.5)' }}
-          />
-
-          <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-pink-300/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4" />
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-5">
             <div className="relative flex-shrink-0">
-              <div
-                className="w-20 h-20 rounded-2xl flex items-center justify-center text-white shadow-lg"
-                style={{
-                  background: 'rgba(255,255,255,0.25)',
-                  backdropFilter: 'blur(8px)',
-                  border: '2px solid rgba(255,255,255,0.4)',
-                }}
-              >
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white shadow-lg bg-white/20 backdrop-blur-md border-2 border-white/40">
                 <Receipt className="w-9 h-9" />
               </div>
-
-              <div
-                className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center"
-                style={{
-                  background: '#16a34a',
-                  boxShadow: '0 2px 8px rgba(22,163,74,0.45)',
-                }}
-              >
+              <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center bg-emerald-500 shadow-lg shadow-emerald-500/30">
                 <CheckCircle2 className="w-3.5 h-3.5 text-white" />
               </div>
             </div>
-
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <span className="text-sm font-medium opacity-80">Cashier Console</span>
-                <span
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
-                  style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    border: '1px solid rgba(255,255,255,0.25)',
-                  }}
-                >
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-white/20 border border-white/25">
                   GST-ready
                 </span>
               </div>
-
-              <h1 className="text-2xl font-bold leading-tight">Billing Folios</h1>
-
+              <h1 className="text-3xl font-bold leading-tight">Billing Folios</h1>
               <div className="flex items-center gap-4 flex-wrap text-sm opacity-80 mt-2">
-                <span className="flex items-center gap-1.5">
-                  <IndianRupee className="w-3.5 h-3.5" />
-                  Charges and taxes
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Wallet className="w-3.5 h-3.5" />
-                  Payments and settlement
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5" />
-                  GST invoice workflow
-                </span>
-              </div>
-
-              <div
-                className="mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-1.5"
-                style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  backdropFilter: 'blur(8px)',
-                }}
-              >
-                <Sparkles className="w-4 h-4" />
-                <span className="text-sm font-bold">
-                  Real-time folio posting, invoice generation, email and reconciliation
-                </span>
+                <span className="flex items-center gap-1.5"><IndianRupee className="w-3.5 h-3.5" /> Charges & taxes</span>
+                <span className="flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> Payments & settlement</span>
+                <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> GST invoice workflow</span>
               </div>
             </div>
-
             <div className="flex gap-2 flex-wrap sm:flex-col sm:items-end">
-              <Button
-                variant="ghost"
-                className="!rounded-xl !border-0 !bg-white/20 !px-3 !py-2 !text-xs !font-semibold !text-white backdrop-blur hover:!bg-white/30"
-                icon={<RefreshCw className="h-3.5 w-3.5" />}
-                onClick={refreshBilling}
-              >
+              <Button variant="ghost" className="!rounded-xl !bg-white/20 !px-3 !py-2 !text-xs !font-semibold !text-white backdrop-blur hover:!bg-white/30" icon={<RefreshCw className="h-3.5 w-3.5" />} onClick={refreshBilling}>
                 Refresh
               </Button>
-
-              <Button
-                variant="ghost"
-                className="!rounded-xl !border-0 !bg-white/20 !px-3 !py-2 !text-xs !font-bold !text-white backdrop-blur hover:!bg-white/30"
-                icon={<CalendarDays className="h-3.5 w-3.5" />}
-                onClick={() => setShowRecon((s) => !s)}
-              >
+              <Button variant="ghost" className="!rounded-xl !bg-white/20 !px-3 !py-2 !text-xs !font-bold !text-white backdrop-blur hover:!bg-white/30" icon={<CalendarDays className="h-3.5 w-3.5" />} onClick={() => setShowRecon((s) => !s)}>
                 {showRecon ? 'Hide Reconciliation' : 'Show Reconciliation'}
               </Button>
             </div>
           </div>
-        </div>
+        </motion.div>
 
+        {/* Feature Cards */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Charges
-              </span>
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-lg"
-                style={{ background: 'linear-gradient(135deg,#fff7ed,#fff1f2)' }}
-              >
-                <IndianRupee className="h-3.5 w-3.5 text-orange-500" />
+          {[
+            { label: 'Charges', icon: IndianRupee, color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-100', desc: 'Real-time posting' },
+            { label: 'Payments', icon: Wallet, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100', desc: 'Multi-mode collection' },
+            { label: 'Invoices', icon: FileText, color: 'text-pink-500', bg: 'bg-pink-50', border: 'border-pink-100', desc: 'GST workflow' },
+            { label: 'Settlement', icon: Clock3, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100', desc: 'Validate & close' },
+          ].map((f) => (
+            <motion.div key={f.label} whileHover={{ y: -3 }} className={`rounded-2xl border ${f.border} ${f.bg} p-4 shadow-sm hover:shadow-md transition-all`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{f.label}</span>
+                <div className={`w-8 h-8 rounded-lg ${f.bg} border ${f.border} flex items-center justify-center`}>
+                  <f.icon className={`w-4 h-4 ${f.color}`} />
+                </div>
               </div>
-            </div>
-            <p className="mt-2 text-lg font-bold text-slate-900">Real-time posting</p>
-            <p className="text-xs text-slate-400">Room, F&B, tax, refunds and discounts</p>
-          </div>
-
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Payments
-              </span>
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-lg"
-                style={{ background: 'linear-gradient(135deg,#ecfdf5,#f0fdf4)' }}
-              >
-                <Wallet className="h-3.5 w-3.5 text-emerald-500" />
-              </div>
-            </div>
-            <p className="mt-2 text-lg font-bold text-slate-900">Multi-mode collection</p>
-            <p className="text-xs text-slate-400">Cash, card, UPI, gateway and direct billing</p>
-          </div>
-
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Invoices
-              </span>
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-lg"
-                style={{ background: 'linear-gradient(135deg,#fdf2f8,#fff1f2)' }}
-              >
-                <FileText className="h-3.5 w-3.5 text-pink-500" />
-              </div>
-            </div>
-            <p className="mt-2 text-lg font-bold text-slate-900">GST workflow</p>
-            <p className="text-xs text-slate-400">Preview, generate, download and email</p>
-          </div>
-
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Settlement
-              </span>
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-lg"
-                style={{ background: 'linear-gradient(135deg,#fffbeb,#fff7ed)' }}
-              >
-                <Clock3 className="h-3.5 w-3.5 text-amber-500" />
-              </div>
-            </div>
-            <p className="mt-2 text-lg font-bold text-slate-900">Validate and close</p>
-            <p className="text-xs text-slate-400">Checkout review, settlement and closure</p>
-          </div>
+              <p className="text-lg font-bold text-slate-900">{f.desc}</p>
+            </motion.div>
+          ))}
         </div>
 
         {showRecon ? <ReconciliationPanel /> : null}
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-          <div className="lg:col-span-4 xl:col-span-4">
-            <FolioListPanel
-              onSelect={setSelectedFolioId}
-              selectedFolioId={selectedFolioId}
-            />
+          <div className="lg:col-span-4">
+            <FolioListPanel onSelect={setSelectedFolioId} selectedFolioId={selectedFolioId} />
           </div>
-
-          <div className="lg:col-span-8 xl:col-span-8">
+          <div className="lg:col-span-8">
             {selectedFolioId ? (
               <FolioDetailPanel folioId={selectedFolioId} />
             ) : (
-              <Card className="overflow-hidden border-white/60 bg-white/85 shadow-xl backdrop-blur">
-                <div className="relative p-0">
-                  <div className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50 px-6 py-5">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg"
-                        style={{
-                          background: 'linear-gradient(135deg,#F97316,#F43F5E)',
-                          boxShadow: '0 10px 24px rgba(249,115,22,0.24)',
-                        }}
-                      >
-                        <Receipt className="h-5 w-5" />
-                      </div>
-
-                      <div>
-                        <p className="text-lg font-bold text-slate-900">
-                          No folio selected
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Choose an item from the folio queue to start billing actions
-                        </p>
-                      </div>
+              <Card className="overflow-hidden border border-gray-200/80 bg-white shadow-xl">
+                <div className="border-b border-orange-100 bg-gradient-to-r from-orange-50 via-pink-50 to-rose-50 px-6 py-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg bg-gradient-to-br from-orange-500 to-pink-500">
+                      <Receipt className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-slate-900">No folio selected</p>
+                      <p className="text-xs text-slate-500">Choose an item from the folio queue to start billing actions</p>
                     </div>
                   </div>
-
-                  <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-                    <div
-                      className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl text-white shadow-lg"
-                      style={{
-                        background: 'linear-gradient(135deg,#fb923c,#f472b6)',
-                        boxShadow: '0 10px 24px rgba(244,114,182,0.20)',
-                      }}
-                    >
-                      <Receipt className="h-9 w-9" />
-                    </div>
-
-                    <h3 className="text-xl font-bold text-slate-900">Select a folio</h3>
-
-                    <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-500">
-                      Pick an open or unsettled folio from the left to manage
-                      charges, payments, invoice preview, GST generation, settlement
-                      and closure.
-                    </p>
-
-                    <div className="mt-6 grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                          Step 1
-                        </p>
-                        <p className="mt-1 text-sm font-bold text-slate-800">
-                          Choose folio
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Open or unsettled folios appear in the queue.
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                          Step 2
-                        </p>
-                        <p className="mt-1 text-sm font-bold text-slate-800">
-                          Complete billing
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Post charges, collect payment, review taxes.
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                          Step 3
-                        </p>
-                        <p className="mt-1 text-sm font-bold text-slate-800">
-                          Generate invoice
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Download, email, settle and close the folio.
-                        </p>
-                      </div>
-                    </div>
+                </div>
+                <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+                  <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl text-white shadow-lg bg-gradient-to-br from-orange-400 to-pink-400">
+                    <Receipt className="h-9 w-9" />
                   </div>
+                  <h3 className="text-xl font-bold text-slate-900">Select a folio</h3>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-500">
+                    Pick an open or unsettled folio from the left to manage charges, payments, invoice preview, GST generation, settlement and closure.
+                  </p>
                 </div>
               </Card>
             )}
           </div>
         </div>
 
+        {/* ═══ THE UPGRADED GUEST BILLING SUMMARY ═══ */}
         <SettledGuestsTable />
       </div>
     </DashboardLayout>
