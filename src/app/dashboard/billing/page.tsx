@@ -2264,13 +2264,13 @@ function SettledGuestsTable() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white tracking-tight">Guest Billing Summary</h2>
-                <p className="text-sm text-slate-400 mt-0.5">Complete folio management with all actions</p>
+                <p className="text-sm text-slate-200 mt-0.5">Complete folio management with all actions</p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 px-4 py-2">
-                <Calendar className="h-4 w-4 text-slate-400" />
+                <Calendar className="h-4 w-4 text-slate-200" />
                 <input
                   type="date"
                   value={startDate}

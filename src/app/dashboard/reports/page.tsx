@@ -1,7 +1,7 @@
 // app/dashboard/reports/page.tsx
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -40,6 +40,17 @@ import {
   BedDouble,
   Receipt,
   Activity,
+  Filter,
+  Sparkles,
+  DoorOpen,
+  CircleDollarSign,
+  ArrowUpRight,
+  UserCheck,
+  UserX,
+  Banknote,
+  ChevronRight,
+  Wallet,
+  CreditCard,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
@@ -449,6 +460,20 @@ function doPrint({
   `);
 
   win.document.close();
+}// ── Modern Color Tokens (Light Theme) ─────────────────────────────────────────
+const THEME = {
+  blue:   { bg: 'bg-sky-50',  text: 'text-sky-700',  border: 'border-sky-100',  icon: 'text-sky-500',  chart: '#38BDF8' },
+  teal:   { bg: 'bg-teal-50',  text: 'text-teal-700',  border: 'border-teal-100',  icon: 'text-teal-500',  chart: '#2DD4BF' },
+  green:  { bg: 'bg-emerald-50',text: 'text-emerald-700',border: 'border-emerald-100',icon: 'text-emerald-500',chart: '#34D399' },
+  amber:  { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-100', icon: 'text-amber-500', chart: '#FBBF24' },
+  purple: { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-100', icon: 'text-violet-500', chart: '#A78BFA' },
+  rose:   { bg: 'bg-rose-50',  text: 'text-rose-700',  border: 'border-rose-100',  icon: 'text-rose-500',  chart: '#FB7185' },
+  slate:  { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-100', icon: 'text-slate-500', chart: '#94A3B8' },
+  orange: { bg: 'bg-orange-50',text: 'text-orange-700',border: 'border-orange-100',icon: 'text-orange-500',chart: '#FB923C' },
+};
+
+function getTheme(key: string) {
+  return THEME[key as keyof typeof THEME] || THEME.slate;
 }
 
 export default function ReportsPage() {
@@ -465,6 +490,12 @@ export default function ReportsPage() {
   const [pStart, setPStart] = useState(today);
   const [pEnd, setPEnd] = useState(today);
   const [pSearch, setPSearch] = useState('');
+  const [debouncedPSearch, setDebouncedPSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedPSearch(pSearch), 400);
+    return () => clearTimeout(timer);
+  }, [pSearch]);
 
   const { data: dashboard, isLoading: dashboardLoad, refetch: refetchDashboard } = useQuery({
     queryKey: ['reports-dashboard'],
@@ -474,43 +505,33 @@ export default function ReportsPage() {
 
   const { data: dbr, isLoading: dbrLoad, refetch: refetchDbr } = useQuery({
     queryKey: ['dbr', reportDate],
-    queryFn: () =>
-      api.get('/api/reports/daily-business', { params: { date: reportDate } }).then((r) => r.data.data),
+    queryFn: () => api.get('/api/reports/daily-business', { params: { date: reportDate } }).then((r) => r.data.data),
     enabled: tab === 'dbr',
   });
 
-  const { data: occupancy, isLoading: occupancyLoad } = useQuery({
+  const { data: occupancy, isLoading: occupancyLoad, refetch: refetchOccupancy } = useQuery({
     queryKey: ['occupancy', occStartDate, occEndDate],
-    queryFn: () =>
-      api
-        .get('/api/reports/occupancy', {
-          params: { startDate: occStartDate, endDate: occEndDate },
-        })
-        .then((r) => r.data.data),
+    queryFn: () => api.get('/api/reports/occupancy', { params: { startDate: occStartDate, endDate: occEndDate } }).then((r) => r.data.data),
     enabled: tab === 'occupancy',
   });
 
-  const { data: rev, isLoading: revLoad } = useQuery({
+  const { data: rev, isLoading: revLoad, refetch: refetchRevenue } = useQuery({
     queryKey: ['rev', startDate, endDate],
-    queryFn: () =>
-      api.get('/api/reports/revenue', { params: { startDate, endDate } }).then((r) => r.data.data),
+    queryFn: () => api.get('/api/reports/revenue', { params: { startDate, endDate } }).then((r) => r.data.data),
     enabled: tab === 'revenue',
   });
 
-  const { data: gStats, isLoading: gLoad } = useQuery({
+  const { data: gStats, isLoading: gLoad, refetch: refetchGuests } = useQuery({
     queryKey: ['guest-stats'],
     queryFn: () => api.get('/api/reports/guests').then((r) => r.data.data),
     enabled: tab === 'guests',
   });
 
-  const { data: police, isLoading: policeLoad } = useQuery({
-    queryKey: ['police', pStart, pEnd],
-    queryFn: () =>
-      api
-        .get('/api/reports/police-verification', {
-          params: { startDate: pStart, endDate: pEnd },
-        })
-        .then((r) => r.data.data),
+  const { data: police, isLoading: policeLoad, refetch: refetchPolice } = useQuery({
+    queryKey: ['police', pStart, pEnd, debouncedPSearch],
+    queryFn: () => api.get('/api/reports/police-verification', {
+      params: { startDate: pStart, endDate: pEnd, search: debouncedPSearch || undefined },
+    }).then((r) => r.data.data),
     enabled: tab === 'police',
   });
 
@@ -519,261 +540,257 @@ export default function ReportsPage() {
 
   const filtered = useMemo(() => {
     const rows = police?.records || [];
-    return rows.filter(
-      (r: any) =>
-        !pSearch ||
-        r.guestName?.toLowerCase().includes(pSearch.toLowerCase()) ||
-        r.bookingRef?.toLowerCase().includes(pSearch.toLowerCase()) ||
-        r.idNumber?.includes(pSearch) ||
-        r.roomNumber?.includes(pSearch) ||
-        r.address?.toLowerCase().includes(pSearch.toLowerCase())
+    if (!pSearch) return rows;
+    return rows.filter((r: any) =>
+      !r.address || r.address.toLowerCase().includes(pSearch.toLowerCase())
     );
   }, [police, pSearch]);
 
+  function setPoliceRange(start: string, end: string) {
+    setPStart(start);
+    setPEnd(end);
+  }
+
   function exportCSV() {
-    if (!filtered.length) {
-      toast.error('No records');
-      return;
-    }
-
-    const H = [
-      '#',
-      'Hotel Name',
-      'Hotel Address',
-      'Guest Name',
-      'DOB',
-      'Gender',
-      'Nationality',
-      'ID Type',
-      'ID Number',
-      'Phone',
-      'Guest Address',
-      'Room',
-      'Check-in',
-      'Time',
-      'Check-out',
-      'Nights',
-      'Purpose',
-      'Status',
-      'ID Verified',
-    ];
-
+    if (!filtered.length) { toast.error('No records'); return; }
+    const H = ['#','Hotel Name','Hotel Address','Guest Name','DOB','Gender','Nationality','ID Type','ID Number','Phone','Guest Address','Room','Check-in','Time','Check-out','Nights','Purpose','Status','ID Verified'];
     const R = filtered.map((r: any, i: number) => [
-      i + 1,
-      `"${hotelMeta.hotelName}"`,
-      `"${hotelMeta.address || ''}"`,
-      `"${r.guestName || ''}"`,
-      `"${r.dob || ''}"`,
-      `"${r.gender || ''}"`,
-      `"${r.nationality || ''}"`,
-      `"${r.idType || ''}"`,
-      `"${r.idNumber || ''}"`,
-      `"${r.phone || ''}"`,
-      `"${r.address || ''}"`,
-      `"${r.roomNumber || ''}"`,
-      `"${r.checkIn || ''}"`,
-      `"${r.checkInTime || ''}"`,
-      `"${r.checkOut || ''}"`,
-      `"${r.nights || ''}"`,
-      `"${r.purposeOfVisit || ''}"`,
-      `"${r.status || ''}"`,
-      r.idVerified ? 'YES' : 'NO',
+      i + 1, `"${hotelMeta.hotelName}"`, `"${hotelMeta.address || ''}"`, `"${r.guestName || ''}"`, `"${r.dob || ''}"`, `"${r.gender || ''}"`, `"${r.nationality || ''}"`, `"${r.idType || ''}"`, `"${r.idNumber || ''}"`, `"${r.phone || ''}"`, `"${r.address || ''}"`, `"${r.roomNumber || ''}"`, `"${r.checkIn || ''}"`, `"${r.checkInTime || ''}"`, `"${r.checkOut || ''}"`, `"${r.nights || ''}"`, `"${r.purposeOfVisit || ''}"`, `"${r.status || ''}"`, r.idVerified ? 'YES' : 'NO',
     ]);
-    function slugify(value: string) {
-      return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    }
+    const slugify = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const csv = [H.join(','), ...R.map((r: any) => r.join(','))].join('\n');
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
       download: `${slugify(hotelMeta.hotelName)}-police-register-${pStart}-${pEnd}.csv`
     });
     a.click();
-    toast.success('Exported!');
+    toast.success('Exported successfully!');
   }
 
   const TABS = [
-    { id: 'dashboard' as const, label: 'Dashboard', icon: Hotel },
-    { id: 'dbr' as const, label: 'Daily Business', icon: BarChart3 },
-    { id: 'occupancy' as const, label: 'Occupancy', icon: BedDouble },
-    { id: 'revenue' as const, label: 'Revenue Analysis', icon: TrendingUp },
-    { id: 'guests' as const, label: 'Guest Statistics', icon: Users },
-    { id: 'police' as const, label: 'Police Verification', icon: Shield },
+    { id: 'dashboard' as const, label: 'Dashboard', icon: Sparkles, color: 'blue' },
+    { id: 'dbr' as const, label: 'Daily Business', icon: BarChart3, color: 'teal' },
+    { id: 'occupancy' as const, label: 'Occupancy', icon: BedDouble, color: 'green' },
+    { id: 'revenue' as const, label: 'Revenue', icon: TrendingUp, color: 'purple' },
+    { id: 'guests' as const, label: 'Guests', icon: Users, color: 'amber' },
+    { id: 'police' as const, label: 'Police', icon: Shield, color: 'rose' },
   ];
 
-  return (
-    <DashboardLayout title='Reports'>
-      <div className="min-h-screen bg-slate-50">
-        <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex flex-col justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Reports & Analytics</h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Hotel PMS business intelligence · {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
-              </p>
-            </div>
+  const handleRefresh = () => {
+    if (tab === 'dashboard') refetchDashboard();
+    if (tab === 'dbr') refetchDbr();
+    if (tab === 'occupancy') refetchOccupancy();
+    if (tab === 'revenue') refetchRevenue();
+    if (tab === 'guests') refetchGuests();
+    if (tab === 'police') refetchPolice();
+  };
 
-            <div className="flex flex-wrap gap-2">
+  return (
+    <DashboardLayout title="Reports">
+      <div className="min-h-screen bg-[#F8FAFC]">
+        <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+          
+          {/* ── Header ─────────────────────────────────────────────────────── */}
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/50 bg-white p-8 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)] backdrop-blur-sm">
+            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-gradient-to-br from-sky-100 to-violet-100 opacity-50 blur-3xl" />
+            <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 opacity-50 blur-3xl" />
+            
+            <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+              <div>
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-600 ring-1 ring-sky-100">
+                  <Sparkles className="h-3 w-3" />
+                  Analytics & Intelligence
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                  Reports Center
+                </h1>
+                <p className="mt-2 text-sm font-medium text-slate-400">
+                  {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+
               <button
-                onClick={() => {
-                  if (tab === 'dashboard') refetchDashboard();
-                  if (tab === 'dbr') refetchDbr();
-                }}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+                onClick={handleRefresh}
+                className="group inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:shadow-md active:scale-95"
               >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
+                <RefreshCw className="h-4 w-4 transition-transform group-hover:rotate-180" />
+                Refresh Data
               </button>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-1 rounded-3xl bg-slate-100 p-1.5">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all',
-                  tab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
-                )}
-              >
-                <t.icon className="h-4 w-4" />
-                {t.label}
-                {t.id === 'police' && (
-                  <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
-                    Legal
-                  </span>
-                )}
-              </button>
-            ))}
+          {/* ── Tabs ───────────────────────────────────────────────────────── */}
+          <div className="flex flex-wrap gap-2 rounded-[1.5rem] bg-white p-2 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] ring-1 ring-slate-100">
+            {TABS.map((t) => {
+              const theme = getTheme(t.color);
+              const isActive = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={cn(
+                    'relative flex items-center gap-2.5 rounded-[1.2rem] px-5 py-3 text-sm font-semibold transition-all duration-300',
+                    isActive
+                      ? `${theme.bg} ${theme.text} shadow-sm ring-1 ${theme.border}`
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                  )}
+                >
+                  <div className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-xl transition-colors',
+                    isActive ? 'bg-white/60' : 'bg-slate-100'
+                  )}>
+                    <t.icon className={cn('h-4 w-4', isActive ? theme.icon : 'text-slate-400')} />
+                  </div>
+                  {t.label}
+                  {t.id === 'police' && (
+                    <span className="ml-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-600 ring-1 ring-rose-200">
+                      Legal
+                    </span>
+                  )}
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className={cn('absolute inset-0 rounded-[1.2rem] ring-1', theme.border)}
+                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <AnimatePresence mode="wait">
+            {/* ═══════════════════════════════════════════════════════════════
+                DASHBOARD
+            ═══════════════════════════════════════════════════════════════ */}
             {tab === 'dashboard' && (
-              <motion.div key="dashboard" {...fadeUp} className="space-y-4">
+              <motion.div key="dashboard" {...fadeUp} className="space-y-6">
                 {dashboardLoad ? (
                   <PageLoader />
                 ) : dashboard ? (
-                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-                      <StatCard
-                        label="Occupancy"
-                        value={`${dashboard.occupancyPct ?? 0}%`}
-                        sub={`${dashboard.occupied ?? 0} occupied`}
-                        colorKey="blue"
-                        icon={Building2}
-                      />
-                      <StatCard
-                        label="Total Rooms"
-                        value={dashboard.totalRooms ?? 0}
-                        sub={`${dashboard.vacant ?? 0} vacant`}
-                        colorKey="teal"
-                        icon={BedDouble}
-                      />
-                      <StatCard
-                        label="Arrivals Today"
-                        value={dashboard.arrivalsToday ?? 0}
-                        sub="Confirmed arrivals"
-                        colorKey="green"
-                        icon={Users}
-                      />
-                      <StatCard
-                        label="Departures Today"
-                        value={dashboard.departuresToday ?? 0}
-                        sub="Expected departures"
-                        colorKey="amber"
-                        icon={Users}
-                      />
-                      <StatCard
-                        label="Revenue Today"
-                        value={formatCurrency(dashboard.revenueToday ?? 0)}
-                        sub="Settled folios"
-                        colorKey="purple"
-                        icon={Receipt}
-                      />
-                      <StatCard
-                        label="Pending Balance"
-                        value={formatCurrency(dashboard.pendingBalance ?? 0)}
-                        sub={`${dashboard.newGuests ?? 0} new guests today`}
-                        colorKey="red"
-                        icon={Activity}
-                      />
+                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-6">
+                    
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+                      {[
+                        { label: 'Occupancy', value: `${dashboard.occupancyPct ?? 0}%`, sub: `${dashboard.occupied ?? 0} occupied`, color: 'blue', icon: Building2 },
+                        { label: 'Total Rooms', value: dashboard.totalRooms ?? 0, sub: `${dashboard.vacant ?? 0} vacant`, color: 'teal', icon: BedDouble },
+                        { label: 'Arrivals', value: dashboard.arrivalsToday ?? 0, sub: 'Confirmed today', color: 'green', icon: DoorOpen },
+                        { label: 'Departures', value: dashboard.departuresToday ?? 0, sub: 'Expected today', color: 'amber', icon: DoorOpen },
+                        { label: 'Revenue', value: formatCurrency(dashboard.revenueToday ?? 0), sub: 'Settled folios', color: 'purple', icon: CircleDollarSign },
+                        { label: 'Pending', value: formatCurrency(dashboard.pendingBalance ?? 0), sub: `${dashboard.newGuests ?? 0} new guests`, color: 'rose', icon: Activity },
+                      ].map((stat) => {
+                        const theme = getTheme(stat.color);
+                        return (
+                          <motion.div
+                            key={stat.label}
+                            variants={fadeUp}
+                            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                            className={cn(
+                              'group relative overflow-hidden rounded-2xl border p-5 transition-shadow hover:shadow-lg',
+                              theme.bg, theme.border, 'bg-white'
+                            )}
+                          >
+                            <div className={cn('absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-20 blur-2xl', theme.bg.replace('bg-', 'bg-'))} />
+                            <div className="relative">
+                              <div className="mb-3 flex items-center justify-between">
+                                <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1', theme.border)}>
+                                  <stat.icon className={cn('h-5 w-5', theme.icon)} />
+                                </div>
+                                <ArrowUpRight className={cn('h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100', theme.icon)} />
+                              </div>
+                              <p className="text-2xl font-bold tracking-tight text-slate-900">{stat.value}</p>
+                              <p className="mt-1 text-xs font-medium text-slate-400">{stat.sub}</p>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                      <Card className="xl:col-span-2">
-                        <CardHeader>
-                          <SectionTitle title="7-Day Revenue Trend" sub="Based on settled folios" />
+                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                      {/* Revenue Chart */}
+                      <Card className="xl:col-span-2 overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
+                          <SectionTitle title="Revenue Trend" sub="Last 7 days · Settled folios" />
                         </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={260}>
+                        <CardContent className="p-6">
+                          <ResponsiveContainer width="100%" height={280}>
                             <AreaChart data={dashboard.revenueChart || []}>
                               <defs>
-                                <linearGradient id="dashboardRevenue" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#1B4FD8" stopOpacity={0.18} />
-                                  <stop offset="95%" stopColor="#1B4FD8" stopOpacity={0} />
+                                <linearGradient id="dashRev" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#38BDF8" stopOpacity={0.25} />
+                                  <stop offset="95%" stopColor="#38BDF8" stopOpacity={0} />
                                 </linearGradient>
                               </defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                              <YAxis
-                                tick={{ fontSize: 11, fill: '#94A3B8' }}
-                                axisLine={false}
-                                tickLine={false}
-                                tickFormatter={(v) => `₹${Math.round(v / 1000)}k`}
-                              />
-                              <Tooltip content={<CustomTooltip />} />
-                              <Area
-                                type="monotone"
-                                dataKey="revenue"
-                                stroke="#1B4FD8"
-                                strokeWidth={2.5}
-                                fill="url(#dashboardRevenue)"
-                                name="Revenue"
-                              />
+                              <CartesianGrid strokeDasharray="4 4" stroke="#F1F5F9" vertical={false} />
+                              <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#94A3B8', fontWeight: 500 }} axisLine={false} tickLine={false} dy={10} />
+                              <YAxis tick={{ fontSize: 12, fill: '#94A3B8', fontWeight: 500 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${Math.round(v / 1000)}k`} />
+                              <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#E2E8F0', strokeWidth: 2 }} />
+                              <Area type="monotone" dataKey="revenue" stroke="#38BDF8" strokeWidth={3} fill="url(#dashRev)" name="Revenue" />
                             </AreaChart>
                           </ResponsiveContainer>
                         </CardContent>
                       </Card>
 
-                      <Card>
-                        <CardHeader>
-                          <SectionTitle title="Operations Snapshot" sub="Current day overview" />
+                      {/* Operations Snapshot */}
+                      <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
+                          <SectionTitle title="Operations" sub="Current day overview" />
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                          {[
-                            { label: 'Occupied Rooms', value: dashboard.occupied ?? 0 },
-                            { label: 'Vacant Rooms', value: dashboard.vacant ?? 0 },
-                            { label: "Today's Arrivals", value: dashboard.arrivalsToday ?? 0 },
-                            { label: "Today's Departures", value: dashboard.departuresToday ?? 0 },
-                            { label: 'New Guests', value: dashboard.newGuests ?? 0 },
-                          ].map((item) => (
-                            <div
-                              key={item.label}
-                              className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
-                            >
-                              <span className="text-sm font-medium text-slate-600">{item.label}</span>
-                              <span className="text-sm font-bold text-slate-900">{item.value}</span>
-                            </div>
-                          ))}
+                        <CardContent className="p-4">
+                          <div className="space-y-2">
+                            {[
+                              { label: 'Occupied Rooms', value: dashboard.occupied ?? 0, icon: BedDouble, color: 'blue' },
+                              { label: 'Vacant Rooms', value: dashboard.vacant ?? 0, icon: Building2, color: 'slate' },
+                              { label: "Today's Arrivals", value: dashboard.arrivalsToday ?? 0, icon: UserCheck, color: 'green' },
+                              { label: "Today's Departures", value: dashboard.departuresToday ?? 0, icon: UserX, color: 'amber' },
+                              { label: 'New Guests', value: dashboard.newGuests ?? 0, icon: Users, color: 'purple' },
+                            ].map((item, i) => {
+                              const theme = getTheme(item.color);
+                              return (
+                                <motion.div
+                                  key={item.label}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: i * 0.1 }}
+                                  className="flex items-center justify-between rounded-xl bg-slate-50/50 px-4 py-3.5 transition-colors hover:bg-slate-50"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg', theme.bg)}>
+                                      <item.icon className={cn('h-4 w-4', theme.icon)} />
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-600">{item.label}</span>
+                                  </div>
+                                  <span className="text-lg font-bold text-slate-900">{item.value}</span>
+                                </motion.div>
+                              );
+                            })}
+                          </div>
                         </CardContent>
                       </Card>
                     </div>
                   </motion.div>
                 ) : (
-                  <div className="py-16 text-center text-sm text-slate-400">Failed to load dashboard</div>
+                  <EmptyState message="Failed to load dashboard" />
                 )}
               </motion.div>
             )}
 
+            {/* ═══════════════════════════════════════════════════════════════
+                DAILY BUSINESS REPORT
+            ═══════════════════════════════════════════════════════════════ */}
             {tab === 'dbr' && (
-              <motion.div key="dbr" {...fadeUp} className="space-y-4">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <DateInput value={reportDate} onChange={setReportDate} />
+              <motion.div key="dbr" {...fadeUp} className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-slate-100">
+                    <Calendar className="h-4 w-4 text-slate-400" />
+                    <DateInput value={reportDate} onChange={setReportDate} />
+                  </div>
                   <button
                     onClick={() => refetchDbr()}
-                    className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50"
+                    className="flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-slate-100 transition-all hover:bg-slate-50 active:scale-95"
                   >
-                    <RefreshCw className="h-3.5 w-3.5" />
+                    <RefreshCw className="h-4 w-4" />
                     Refresh
                   </button>
                 </div>
@@ -781,130 +798,100 @@ export default function ReportsPage() {
                 {dbrLoad ? (
                   <PageLoader />
                 ) : dbr ? (
-                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-                      <StatCard
-                        label="Occupancy"
-                        value={`${dbr.occupancy?.pct ?? 0}%`}
-                        sub={`${dbr.occupancy?.occupied}/${dbr.occupancy?.rooms}`}
-                        colorKey="blue"
-                        icon={Building2}
-                      />
-                      <StatCard
-                        label="ADR"
-                        value={formatCurrency(dbr.adr ?? 0)}
-                        sub="Avg daily rate"
-                        colorKey="green"
-                        icon={TrendingUp}
-                      />
-                      <StatCard
-                        label="RevPAR"
-                        value={formatCurrency(dbr.revpar ?? 0)}
-                        sub="Per available room"
-                        colorKey="purple"
-                        icon={BarChart3}
-                      />
-                      <StatCard
-                        label="Revenue"
-                        value={formatCurrency(dbr.revenue?.total ?? 0)}
-                        sub={`Net: ${formatCurrency(dbr.revenue?.net ?? 0)}`}
-                        colorKey="amber"
-                        icon={Receipt}
-                      />
-                      <StatCard
-                        label="Arrivals"
-                        value={dbr.arrivals?.count ?? 0}
-                        sub="Check-ins"
-                        colorKey="teal"
-                        icon={Users}
-                      />
-                      <StatCard
-                        label="Departures"
-                        value={dbr.departures?.count ?? 0}
-                        sub="Check-outs"
-                        colorKey="red"
-                        icon={Users}
-                      />
+                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-6">
+                    {/* Main Stats */}
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+                      {[
+                        { label: 'Occupancy', value: `${dbr.occupancy?.pct ?? 0}%`, sub: `${dbr.occupancy?.occupied}/${dbr.occupancy?.rooms}`, color: 'blue', icon: Building2 },
+                        { label: 'ADR', value: formatCurrency(dbr.adr ?? 0), sub: 'Avg daily rate', color: 'green', icon: TrendingUp },
+                        { label: 'RevPAR', value: formatCurrency(dbr.revpar ?? 0), sub: 'Per room', color: 'purple', icon: BarChart3 },
+                        { label: 'Revenue', value: formatCurrency(dbr.revenue?.total ?? 0), sub: `Net: ${formatCurrency(dbr.revenue?.net ?? 0)}`, color: 'amber', icon: Receipt },
+                        { label: 'Arrivals', value: dbr.arrivals?.count ?? 0, sub: 'Check-ins', color: 'teal', icon: UserCheck },
+                        { label: 'Departures', value: dbr.departures?.count ?? 0, sub: 'Check-outs', color: 'rose', icon: UserX },
+                      ].map((stat) => {
+                        const theme = getTheme(stat.color);
+                        return (
+                          <motion.div key={stat.label} variants={fadeUp} whileHover={{ y: -2 }} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                            <div className={cn('mb-3 flex h-10 w-10 items-center justify-center rounded-xl', theme.bg)}>
+                              <stat.icon className={cn('h-5 w-5', theme.icon)} />
+                            </div>
+                            <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                            <p className="mt-1 text-xs font-medium text-slate-400">{stat.sub}</p>
+                          </motion.div>
+                        );
+                      })}
                     </div>
 
+                    {/* Secondary Stats */}
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                       {[
-                        { l: 'In-House', v: dbr.inHouse ?? 0, c: 'bg-blue-50 text-blue-700' },
-                        { l: 'No Shows', v: dbr.noShows ?? 0, c: 'bg-red-50 text-red-700' },
-                        { l: 'Cancellations', v: dbr.cancellations ?? 0, c: 'bg-amber-50 text-amber-700' },
-                        { l: 'Cash Revenue', v: formatCurrency(dbr.revenue?.cash ?? 0), c: 'bg-green-50 text-green-700' },
-                        {
-                          l: 'Digital Payments',
-                          v: formatCurrency((dbr.revenue?.upi ?? 0) + (dbr.revenue?.card ?? 0) + (dbr.revenue?.razorpay ?? 0)),
-                          c: 'bg-purple-50 text-purple-700',
-                        },
-                      ].map((s) => (
-                        <motion.div
-                          key={s.l}
-                          variants={fadeUp}
-                          className={`${s.c} rounded-2xl border border-white/60 p-3 text-center`}
-                        >
-                          <p className="text-lg font-bold">{s.v}</p>
-                          <p className="mt-0.5 text-xs font-medium text-slate-500">{s.l}</p>
-                        </motion.div>
-                      ))}
+                        { l: 'In-House', v: dbr.inHouse ?? 0, color: 'blue', icon: Users },
+                        { l: 'No Shows', v: dbr.noShows ?? 0, color: 'rose', icon: UserX },
+                        { l: 'Cancellations', v: dbr.cancellations ?? 0, color: 'amber', icon: AlertTriangle },
+                        { l: 'Cash', v: formatCurrency(dbr.revenue?.cash ?? 0), color: 'green', icon: Banknote },
+                        { l: 'Digital', v: formatCurrency((dbr.revenue?.upi ?? 0) + (dbr.revenue?.card ?? 0) + (dbr.revenue?.razorpay ?? 0)), color: 'purple', icon: CreditCard },
+                      ].map((s) => {
+                        const theme = getTheme(s.color);
+                        return (
+                          <motion.div key={s.l} variants={fadeUp} whileHover={{ scale: 1.02 }} className={cn('flex items-center gap-3 rounded-2xl border p-4', theme.bg, theme.border)}>
+                            <s.icon className={cn('h-5 w-5', theme.icon)} />
+                            <div>
+                              <p className="text-lg font-bold text-slate-900">{s.v}</p>
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{s.l}</p>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
 
+                    {/* Revenue by Department */}
                     {dbr.revenue?.breakdown?.length > 0 && (
-                      <Card>
-                        <CardHeader>
+                      <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
                           <SectionTitle title="Revenue by Department" />
                         </CardHeader>
-                        <CardContent>
-                          <div className="flex flex-wrap gap-2">
+                        <CardContent className="p-6">
+                          <div className="flex flex-wrap gap-3">
                             {dbr.revenue.breakdown.map((d: any) => (
-                              <div
+                              <motion.div
                                 key={d._id}
-                                className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-2.5"
+                                whileHover={{ scale: 1.05 }}
+                                className="flex items-center gap-3 rounded-xl bg-slate-50 px-5 py-3 ring-1 ring-slate-100 transition-shadow hover:shadow-md"
                               >
-                                <div
-                                  className="h-2.5 w-2.5 rounded-sm"
-                                  style={{ backgroundColor: DEPT_COLORS[d._id] || '#64748B' }}
-                                />
-                                <span className="text-xs font-semibold capitalize text-slate-700">{d._id}</span>
+                                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: DEPT_COLORS[d._id] || '#64748B' }} />
+                                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{d._id}</span>
                                 <span className="text-sm font-bold text-slate-900">{formatCurrency(d.amount)}</span>
-                              </div>
+                              </motion.div>
                             ))}
                           </div>
                         </CardContent>
                       </Card>
                     )}
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {/* Arrivals & Departures */}
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                       {[
-                        {
-                          title: 'Arrivals',
-                          data: dbr.arrivals?.list,
-                          badge: 'success' as const,
-                          accent: 'bg-green-50 text-green-700 border-green-100',
-                        },
-                        {
-                          title: 'Departures',
-                          data: dbr.departures?.list,
-                          badge: 'warning' as const,
-                          accent: 'bg-orange-50 text-orange-700 border-orange-100',
-                        },
+                        { title: 'Arrivals', data: dbr.arrivals?.list, badge: 'success' as const, accent: 'bg-emerald-50 text-emerald-700 ring-emerald-100', icon: UserCheck },
+                        { title: 'Departures', data: dbr.departures?.list, badge: 'warning' as const, accent: 'bg-amber-50 text-amber-700 ring-amber-100', icon: UserX },
                       ].map((section) => (
-                        <Card key={section.title}>
-                          <CardHeader>
-                            <h3 className="font-semibold text-slate-900">{section.title}</h3>
+                        <Card key={section.title} className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                          <CardHeader className="flex items-center justify-between border-b border-slate-50 px-6 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg', section.accent)}>
+                                <section.icon className="h-4 w-4" />
+                              </div>
+                              <h3 className="font-semibold text-slate-900">{section.title}</h3>
+                            </div>
                             <Badge variant={section.badge}>{section.data?.length || 0}</Badge>
                           </CardHeader>
 
                           {!section.data?.length ? (
-                            <div className="px-5 py-8 text-center text-sm text-slate-400">None today</div>
+                            <div className="px-6 py-10 text-center text-sm text-slate-400">None today</div>
                           ) : (
-                            <div className="divide-y divide-slate-100">
+                            <div className="divide-y divide-slate-50">
                               {section.data.map((r: any) => (
-                                <div key={r._id} className="flex items-center gap-3 px-5 py-3">
-                                  <div
-                                    className={`${section.accent} flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border text-xs font-bold`}
-                                  >
+                                <div key={r._id} className="group flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/50">
+                                  <div className={cn('flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-sm font-bold ring-1', section.accent)}>
                                     {r.roomNumber}
                                   </div>
                                   <div className="min-w-0 flex-1">
@@ -915,8 +902,9 @@ export default function ReportsPage() {
                                   </div>
                                   <div className="flex-shrink-0 text-right">
                                     <p className="text-sm font-bold text-slate-900">{formatCurrency(r.totalAmount)}</p>
-                                    <p className="text-xs text-slate-400">{r.nights}n</p>
+                                    <p className="text-xs text-slate-400">{r.nights} nights</p>
                                   </div>
+                                  <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100" />
                                 </div>
                               ))}
                             </div>
@@ -926,98 +914,84 @@ export default function ReportsPage() {
                     </div>
                   </motion.div>
                 ) : (
-                  <div className="py-16 text-center text-sm text-slate-400">No data for this date</div>
+                  <EmptyState message="No data for this date" />
                 )}
               </motion.div>
             )}
 
+            {/* ═══════════════════════════════════════════════════════════════
+                OCCUPANCY
+            ═══════════════════════════════════════════════════════════════ */}
             {tab === 'occupancy' && (
-              <motion.div key="occupancy" {...fadeUp} className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
+              <motion.div key="occupancy" {...fadeUp} className="space-y-6">
+                <div className="flex w-fit items-center gap-3 rounded-2xl bg-white px-5 py-3 shadow-sm ring-1 ring-slate-100">
+                  <Calendar className="h-4 w-4 text-slate-400" />
                   <DateInput value={occStartDate} onChange={setOccStartDate} />
-                  <span className="text-sm font-medium text-slate-400">to</span>
+                  <span className="text-xs font-medium text-slate-300">to</span>
                   <DateInput value={occEndDate} onChange={setOccEndDate} />
                 </div>
 
                 {occupancyLoad ? (
                   <PageLoader />
                 ) : occupancy ? (
-                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <SectionTitle title="Occupancy Trend" sub="Day-wise occupied rooms and occupancy percentage" />
+                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-6">
+                    <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                      <CardHeader className="border-b border-slate-50 px-6 py-5">
+                        <SectionTitle title="Occupancy Trend" sub="Day-wise occupied rooms and percentage" />
                       </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
+                      <CardContent className="p-6">
+                        <ResponsiveContainer width="100%" height={320}>
                           <LineChart data={occupancy}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                            <YAxis
-                              yAxisId="left"
-                              tick={{ fontSize: 11, fill: '#94A3B8' }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              yAxisId="right"
-                              orientation="right"
-                              tick={{ fontSize: 11, fill: '#94A3B8' }}
-                              axisLine={false}
-                              tickLine={false}
-                            />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Line
-                              yAxisId="left"
-                              type="monotone"
-                              dataKey="occupied"
-                              stroke="#1B4FD8"
-                              strokeWidth={2.5}
-                              dot={{ r: 3 }}
-                              name="Occupied Rooms"
-                            />
-                            <Line
-                              yAxisId="right"
-                              type="monotone"
-                              dataKey="occupancyPct"
-                              stroke="#059669"
-                              strokeWidth={2.5}
-                              dot={{ r: 3 }}
-                              name="Occupancy %"
-                            />
+                            <CartesianGrid strokeDasharray="4 4" stroke="#F1F5F9" vertical={false} />
+                            <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#94A3B8', fontWeight: 500 }} axisLine={false} tickLine={false} dy={10} />
+                            <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} unit="%" />
+                            <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#E2E8F0', strokeWidth: 2 }} />
+                            <Line yAxisId="left" type="monotone" dataKey="occupied" stroke="#38BDF8" strokeWidth={3} dot={{ r: 4, fill: '#38BDF8', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} name="Occupied Rooms" />
+                            <Line yAxisId="right" type="monotone" dataKey="occupancyPct" stroke="#34D399" strokeWidth={3} dot={{ r: 4, fill: '#34D399', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} name="Occupancy %" />
                           </LineChart>
                         </ResponsiveContainer>
                       </CardContent>
                     </Card>
 
-                    <Card>
-                      <CardHeader>
-                        <SectionTitle title="Daily Occupancy Table" />
+                    <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                      <CardHeader className="border-b border-slate-50 px-6 py-5">
+                        <SectionTitle title="Daily Breakdown" />
                       </CardHeader>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr>
+                            <tr className="bg-slate-50/50">
                               {['Date', 'Occupied Rooms', 'Occupancy %'].map((h) => (
-                                <th
-                                  key={h}
-                                  className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
-                                >
-                                  {h}
-                                </th>
+                                <th key={h} className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-400">{h}</th>
                               ))}
                             </tr>
                           </thead>
-                          <tbody>
-                            {occupancy.map((row: any) => (
-                              <tr key={row.date} className="border-b border-slate-100">
-                                <td className="px-4 py-3 font-medium text-slate-700">{row.date}</td>
-                                <td className="px-4 py-3 text-slate-600">{row.occupied}</td>
-                                <td className="px-4 py-3">
-                                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                                    {row.occupancyPct}%
-                                  </span>
+                          <tbody className="divide-y divide-slate-50">
+                            {occupancy.map((row: any, i: number) => (
+                              <motion.tr
+                                key={row.date}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.03 }}
+                                className="group transition-colors hover:bg-sky-50/30"
+                              >
+                                <td className="px-6 py-4 font-medium text-slate-700">{row.date}</td>
+                                <td className="px-6 py-4 text-slate-600">{row.occupied}</td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100">
+                                      <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${row.occupancyPct}%` }}
+                                        transition={{ duration: 0.8, delay: i * 0.05 }}
+                                        className="h-full rounded-full bg-gradient-to-r from-sky-400 to-teal-400"
+                                      />
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-700">{row.occupancyPct}%</span>
+                                  </div>
                                 </td>
-                              </tr>
+                              </motion.tr>
                             ))}
                           </tbody>
                         </table>
@@ -1025,96 +999,108 @@ export default function ReportsPage() {
                     </Card>
                   </motion.div>
                 ) : (
-                  <div className="py-16 text-center text-sm text-slate-400">No occupancy data</div>
+                  <EmptyState message="No occupancy data" />
                 )}
               </motion.div>
             )}
 
+            {/* ═══════════════════════════════════════════════════════════════
+                REVENUE
+            ═══════════════════════════════════════════════════════════════ */}
             {tab === 'revenue' && (
-              <motion.div key="revenue" {...fadeUp} className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
+              <motion.div key="revenue" {...fadeUp} className="space-y-6">
+                <div className="flex w-fit items-center gap-3 rounded-2xl bg-white px-5 py-3 shadow-sm ring-1 ring-slate-100">
+                  <Calendar className="h-4 w-4 text-slate-400" />
                   <DateInput value={startDate} onChange={setStartDate} />
-                  <span className="text-sm font-medium text-slate-400">to</span>
+                  <span className="text-xs font-medium text-slate-300">to</span>
                   <DateInput value={endDate} onChange={setEndDate} />
                 </div>
 
                 {revLoad ? (
                   <PageLoader />
                 ) : rev ? (
-                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-4">
-                    <motion.div variants={fadeUp} className="rounded-3xl bg-gradient-to-br from-blue-600 to-blue-800 p-5 text-white">
-                      <p className="mb-1 text-sm font-medium text-blue-200">
-                        Total Revenue — {rev.period?.start} to {rev.period?.end}
-                      </p>
-                      <p className="text-4xl font-bold tracking-tight">{formatCurrency(rev.summary?.total || 0)}</p>
-                      <p className="mt-1 text-sm text-blue-200">{rev.summary?.count || 0} payments recorded</p>
+                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-6">
+                    {/* Hero Stat */}
+                    <motion.div
+                      variants={fadeUp}
+                      className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-sky-500 via-blue-500 to-violet-500 p-8 text-white shadow-lg shadow-blue-200"
+                    >
+                      <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+                      <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+                      <div className="relative">
+                        <p className="mb-1 text-sm font-medium text-blue-100">
+                          Total Revenue · {rev.period?.start} to {rev.period?.end}
+                        </p>
+                        <p className="text-5xl font-bold tracking-tight">{formatCurrency(rev.summary?.total || 0)}</p>
+                        <div className="mt-4 flex items-center gap-2">
+                          <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur-sm">
+                            {rev.summary?.count || 0} payments
+                          </span>
+                          <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur-sm">
+                            {rev.byDay?.length || 0} active days
+                          </span>
+                        </div>
+                      </div>
                     </motion.div>
 
                     {rev.byDay?.length > 0 ? (
-                      <Card>
-                        <CardHeader>
+                      <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
                           <SectionTitle title="Daily Revenue" />
                         </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={220}>
-                            <AreaChart data={rev.byDay} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                        <CardContent className="p-6">
+                          <ResponsiveContainer width="100%" height={240}>
+                            <AreaChart data={rev.byDay}>
                               <defs>
-                                <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#1B4FD8" stopOpacity={0.15} />
-                                  <stop offset="95%" stopColor="#1B4FD8" stopOpacity={0} />
+                                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#818CF8" stopOpacity={0.25} />
+                                  <stop offset="95%" stopColor="#818CF8" stopOpacity={0} />
                                 </linearGradient>
                               </defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                              <XAxis dataKey="_id" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                              <YAxis
-                                tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                                axisLine={false}
-                                tickLine={false}
-                                tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                              />
-                              <Tooltip content={<CustomTooltip />} />
-                              <Area
-                                type="monotone"
-                                dataKey="revenue"
-                                stroke="#1B4FD8"
-                                strokeWidth={2.5}
-                                fill="url(#rg)"
-                                dot={{ fill: '#1B4FD8', r: 3 }}
-                                name="Revenue"
-                              />
+                              <CartesianGrid strokeDasharray="4 4" stroke="#F1F5F9" vertical={false} />
+                              <XAxis dataKey="_id" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} dy={10} />
+                              <YAxis tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                              <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#E2E8F0', strokeWidth: 2 }} />
+                              <Area type="monotone" dataKey="revenue" stroke="#818CF8" strokeWidth={3} fill="url(#revGrad)" dot={{ fill: '#818CF8', r: 4, strokeWidth: 2, stroke: '#fff' }} name="Revenue" />
                             </AreaChart>
                           </ResponsiveContainer>
                         </CardContent>
                       </Card>
                     ) : (
-                      <Card>
-                        <CardContent className="py-10 text-center text-sm text-slate-400">
-                          No payment data in this period. Record payments in Billing to see revenue here.
+                      <Card className="border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardContent className="py-16 text-center">
+                          <Wallet className="mx-auto mb-4 h-12 w-12 text-slate-200" />
+                          <p className="text-sm font-medium text-slate-500">No payment data in this period</p>
+                          <p className="mt-1 text-xs text-slate-400">Record payments in Billing to see revenue here</p>
                         </CardContent>
                       </Card>
                     )}
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <Card>
-                        <CardHeader>
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {/* By Department */}
+                      <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
                           <SectionTitle title="By Department" />
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="p-6">
                           {rev.byDepartment?.length > 0 ? (
-                            <div className="space-y-3">
+                            <div className="space-y-5">
                               {rev.byDepartment.map((d: any, i: number) => {
                                 const pct = rev.byDepartment[0].revenue > 0 ? (d.revenue / rev.byDepartment[0].revenue) * 100 : 0;
                                 return (
                                   <div key={d._id}>
-                                    <div className="mb-1 flex justify-between text-sm">
-                                      <span className="font-medium capitalize text-slate-700">{d._id}</span>
-                                      <span className="font-bold text-slate-900">{formatCurrency(d.revenue)}</span>
+                                    <div className="mb-2 flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: DEPT_COLORS[d._id] || '#64748B' }} />
+                                        <span className="text-sm font-semibold capitalize text-slate-700">{d._id}</span>
+                                      </div>
+                                      <span className="text-sm font-bold text-slate-900">{formatCurrency(d.revenue)}</span>
                                     </div>
-                                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
                                       <motion.div
                                         initial={{ width: 0 }}
                                         animate={{ width: `${pct}%` }}
-                                        transition={{ duration: 0.7, delay: i * 0.08 }}
+                                        transition={{ duration: 0.8, delay: i * 0.1 }}
                                         className="h-full rounded-full"
                                         style={{ backgroundColor: DEPT_COLORS[d._id] || '#64748B' }}
                                       />
@@ -1124,21 +1110,31 @@ export default function ReportsPage() {
                               })}
                             </div>
                           ) : (
-                            <p className="py-8 text-center text-sm text-slate-400">No charge data yet</p>
+                            <EmptyState message="No charge data yet" />
                           )}
                         </CardContent>
                       </Card>
 
-                      <Card>
-                        <CardHeader>
+                      {/* By Payment Mode */}
+                      <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
                           <SectionTitle title="By Payment Mode" />
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="p-6">
                           {rev.byPaymentMode?.length > 0 ? (
-                            <div className="flex items-center gap-4">
-                              <ResponsiveContainer width={120} height={120}>
+                            <div className="flex items-center gap-8">
+                              <ResponsiveContainer width={140} height={140}>
                                 <PieChart>
-                                  <Pie data={rev.byPaymentMode} dataKey="amount" cx="50%" cy="50%" innerRadius={32} outerRadius={52} paddingAngle={3}>
+                                  <Pie
+                                    data={rev.byPaymentMode}
+                                    dataKey="amount"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={40}
+                                    outerRadius={65}
+                                    paddingAngle={4}
+                                    stroke="none"
+                                  >
                                     {rev.byPaymentMode.map((_: any, i: number) => (
                                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                                     ))}
@@ -1146,50 +1142,38 @@ export default function ReportsPage() {
                                 </PieChart>
                               </ResponsiveContainer>
 
-                              <div className="flex-1 space-y-2">
+                              <div className="flex-1 space-y-3">
                                 {rev.byPaymentMode.map((m: any, i: number) => (
-                                  <div key={m._id} className="flex items-center justify-between text-sm">
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                                      <span className="font-medium text-slate-600">{MODE_LABELS[m._id] || m._id}</span>
+                                  <div key={m._id} className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                                      <span className="text-sm font-medium text-slate-600">{MODE_LABELS[m._id] || m._id}</span>
                                     </div>
-                                    <span className="font-bold text-slate-900">{formatCurrency(m.amount)}</span>
+                                    <span className="text-sm font-bold text-slate-900">{formatCurrency(m.amount)}</span>
                                   </div>
                                 ))}
                               </div>
                             </div>
                           ) : (
-                            <p className="py-8 text-center text-sm text-slate-400">No payment data yet</p>
+                            <EmptyState message="No payment data yet" />
                           )}
                         </CardContent>
                       </Card>
                     </div>
 
                     {rev.bySource?.length > 0 && (
-                      <Card>
-                        <CardHeader>
+                      <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
                           <SectionTitle title="Revenue by Booking Source" />
                         </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={180}>
-                            <BarChart data={rev.bySource} layout="vertical" margin={{ top: 0, right: 16, left: 70, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" horizontal={false} />
-                              <XAxis
-                                type="number"
-                                tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                                axisLine={false}
-                                tickLine={false}
-                                tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                              />
-                              <YAxis
-                                type="category"
-                                dataKey="_id"
-                                tick={{ fontSize: 11, fill: '#374151' }}
-                                axisLine={false}
-                                tickLine={false}
-                              />
-                              <Tooltip content={<CustomTooltip />} />
-                              <Bar dataKey="revenue" radius={[0, 4, 4, 0]} name="Revenue">
+                        <CardContent className="p-6">
+                          <ResponsiveContainer width="100%" height={200}>
+                            <BarChart data={rev.bySource} layout="vertical" margin={{ top: 0, right: 16, left: 80, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
+                              <XAxis type="number" tick={{ fontSize: 12, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                              <YAxis type="category" dataKey="_id" tick={{ fontSize: 12, fill: '#475569', fontWeight: 500 }} axisLine={false} tickLine={false} width={80} />
+                              <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F8FAFC' }} />
+                              <Bar dataKey="revenue" radius={[0, 8, 8, 0]} barSize={24}>
                                 {rev.bySource.map((_: any, i: number) => (
                                   <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                                 ))}
@@ -1204,45 +1188,58 @@ export default function ReportsPage() {
               </motion.div>
             )}
 
+            {/* ═══════════════════════════════════════════════════════════════
+                GUESTS
+            ═══════════════════════════════════════════════════════════════ */}
             {tab === 'guests' && (
-              <motion.div key="guests" {...fadeUp} className="space-y-4">
+              <motion.div key="guests" {...fadeUp} className="space-y-6">
                 {gLoad ? (
                   <PageLoader />
                 ) : (
-                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <StatCard label="Total Guests" value={gStats?.total ?? '—'} colorKey="blue" icon={Users} />
-                      <StatCard label="VIP Guests" value={gStats?.vip ?? '—'} colorKey="amber" icon={Star} />
-                      <StatCard label="Loyalty Members" value={gStats?.loyalty ?? '—'} colorKey="purple" icon={Star} />
-                      <StatCard label="Foreign Guests" value={gStats?.foreign ?? '—'} colorKey="teal" icon={Globe} />
+                  <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      {[
+                        { label: 'Total Guests', value: gStats?.total ?? '—', color: 'blue', icon: Users },
+                        { label: 'VIP', value: gStats?.vip ?? '—', color: 'amber', icon: Star },
+                        { label: 'Loyalty', value: gStats?.loyalty ?? '—', color: 'purple', icon: Sparkles },
+                        { label: 'Foreign', value: gStats?.foreign ?? '—', color: 'teal', icon: Globe },
+                      ].map((stat) => {
+                        const theme = getTheme(stat.color);
+                        return (
+                          <motion.div key={stat.label} variants={fadeUp} whileHover={{ y: -2 }} className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+                            <div className={cn('mb-3 flex h-10 w-10 items-center justify-center rounded-xl', theme.bg)}>
+                              <stat.icon className={cn('h-5 w-5', theme.icon)} />
+                            </div>
+                            <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
+                            <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-400">{stat.label}</p>
+                          </motion.div>
+                        );
+                      })}
                     </div>
 
                     {gStats?.byTier?.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <SectionTitle title="Loyalty Tier Distribution" />
+                      <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
+                          <SectionTitle title="Loyalty Tiers" />
                         </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <CardContent className="p-6">
+                          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                             {gStats.byTier.map((t: any) => {
                               const cls: Record<string, string> = {
-                                bronze: 'bg-amber-50 text-amber-700 border-amber-100',
-                                silver: 'bg-slate-50 text-slate-700 border-slate-100',
-                                gold: 'bg-yellow-50 text-yellow-700 border-yellow-100',
-                                platinum: 'bg-purple-50 text-purple-700 border-purple-100',
+                                bronze: 'bg-amber-50 text-amber-700 ring-amber-100',
+                                silver: 'bg-slate-50 text-slate-700 ring-slate-100',
+                                gold: 'bg-yellow-50 text-yellow-700 ring-yellow-100',
+                                platinum: 'bg-violet-50 text-violet-700 ring-violet-100',
                               };
-
                               return (
-                                <div
+                                <motion.div
                                   key={t._id}
-                                  className={cn(
-                                    'rounded-2xl border p-4 text-center capitalize',
-                                    cls[t._id] || 'border-slate-100 bg-slate-50 text-slate-700',
-                                  )}
+                                  whileHover={{ scale: 1.03 }}
+                                  className={cn('rounded-2xl border p-6 text-center capitalize shadow-sm transition-shadow hover:shadow-md', cls[t._id] || 'border-slate-100 bg-slate-50 text-slate-700')}
                                 >
-                                  <p className="text-2xl font-bold">{t.count}</p>
-                                  <p className="mt-1 text-xs font-semibold">{t._id || 'untagged'}</p>
-                                </div>
+                                  <p className="text-3xl font-bold">{t.count}</p>
+                                  <p className="mt-2 text-xs font-bold uppercase tracking-wider opacity-70">{t._id || 'untagged'}</p>
+                                </motion.div>
                               );
                             })}
                           </div>
@@ -1251,78 +1248,71 @@ export default function ReportsPage() {
                     )}
 
                     {gStats?.byNationality?.length > 0 && (
-                      <Card>
-                        <CardHeader>
+                      <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
                           <SectionTitle title="Nationality Breakdown" />
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                          {gStats.byNationality.slice(0, 8).map((n: any, i: number) => (
-                            <div key={n._id} className="flex items-center gap-3">
-                              <span className="w-24 flex-shrink-0 text-right text-sm font-medium text-slate-700">{n._id}</span>
-                              <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                                <motion.div
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${(n.count / gStats.byNationality[0].count) * 100}%` }}
-                                  transition={{ duration: 0.7, delay: i * 0.06 }}
-                                  className="h-full rounded-full"
-                                  style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
-                                />
+                        <CardContent className="p-6">
+                          <div className="space-y-4">
+                            {gStats.byNationality.slice(0, 8).map((n: any, i: number) => (
+                              <div key={n._id} className="flex items-center gap-4">
+                                <span className="w-28 flex-shrink-0 text-right text-sm font-semibold text-slate-700">{n._id}</span>
+                                <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${(n.count / gStats.byNationality[0].count) * 100}%` }}
+                                    transition={{ duration: 0.8, delay: i * 0.08 }}
+                                    className="h-full rounded-full"
+                                    style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                                  />
+                                </div>
+                                <span className="w-10 flex-shrink-0 text-sm font-bold text-slate-900">{n.count}</span>
                               </div>
-                              <span className="w-8 flex-shrink-0 text-sm font-bold text-slate-900">{n.count}</span>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </CardContent>
                       </Card>
                     )}
 
                     {gStats?.topGuests?.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <h3 className="font-semibold text-slate-900">Top Guests by Revenue</h3>
-                          <span className="text-xs text-slate-400">All-time</span>
+                      <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardHeader className="border-b border-slate-50 px-6 py-5">
+                          <SectionTitle title="Top Guests by Revenue" sub="All-time highest value guests" />
                         </CardHeader>
-                        <div className="divide-y divide-slate-100">
+                        <div className="divide-y divide-slate-50">
                           {gStats.topGuests.map((g: any, i: number) => (
-                            <div key={g._id} className="flex items-center gap-3 px-5 py-3">
-                              <span
-                                className={cn(
-                                  'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                                  i === 0
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : i === 1
-                                      ? 'bg-slate-100 text-slate-600'
-                                      : i === 2
-                                        ? 'bg-amber-100 text-amber-700'
-                                        : 'bg-slate-50 text-slate-400',
-                                )}
-                              >
+                            <motion.div
+                              key={g._id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: i * 0.1 }}
+                              className="group flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/50"
+                            >
+                              <span className={cn(
+                                'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                                i === 0 ? 'bg-yellow-100 text-yellow-700' : i === 1 ? 'bg-slate-100 text-slate-600' : i === 2 ? 'bg-amber-100 text-amber-700' : 'bg-slate-50 text-slate-400'
+                              )}>
                                 {i + 1}
                               </span>
-
-                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-sky-100 to-blue-100 text-sm font-bold text-sky-700">
                                 {g.firstName?.[0]}
                               </div>
-
                               <div className="flex-1">
-                                <p className="text-sm font-semibold text-slate-900">
-                                  {g.firstName} {g.lastName}
-                                </p>
-                                <p className="text-xs text-slate-400">
-                                  {g.stayCount} stays · <span className="capitalize">{g.loyalty?.tier}</span>
-                                </p>
+                                <p className="text-sm font-semibold text-slate-900">{g.firstName} {g.lastName}</p>
+                                <p className="text-xs text-slate-400">{g.stayCount} stays · <span className="capitalize font-medium text-slate-500">{g.loyalty?.tier}</span></p>
                               </div>
-
                               <span className="text-sm font-bold text-slate-900">{formatCurrency(g.totalRevenue)}</span>
-                            </div>
+                              <ChevronRight className="h-4 w-4 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100" />
+                            </motion.div>
                           ))}
                         </div>
                       </Card>
                     )}
 
                     {!gStats && (
-                      <Card>
-                        <CardContent className="py-12 text-center">
-                          <Users className="mx-auto mb-3 h-10 w-10 text-slate-200" />
+                      <Card className="border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <CardContent className="py-16 text-center">
+                          <Users className="mx-auto mb-4 h-12 w-12 text-slate-200" />
                           <p className="font-medium text-slate-500">No guest data available</p>
                           <p className="mt-1 text-sm text-slate-400">Add guests and complete reservations to see analytics</p>
                         </CardContent>
@@ -1333,102 +1323,133 @@ export default function ReportsPage() {
               </motion.div>
             )}
 
+            {/* ═══════════════════════════════════════════════════════════════
+                POLICE VERIFICATION
+            ═══════════════════════════════════════════════════════════════ */}
             {tab === 'police' && (
-              <motion.div key="police" {...fadeUp} className="space-y-4">
-                <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
-                  <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
-                  <div>
-                    <p className="text-sm font-semibold text-red-900">Legal Requirement — India</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-red-700">
-                      Under Rule 14, Registration of Foreigners Rules 1992 and Hotel and Lodging Houses Act, every hotel must maintain a guest register and submit to local police within 24 hours of check-in. Foreign nationals are mandatory within 24 hours per Foreigners Act 1946.
-                    </p>
+              <motion.div key="police" {...fadeUp} className="space-y-6">
+                {/* Legal Banner */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-rose-50 to-orange-50 p-5 ring-1 ring-rose-100">
+                  <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-rose-200/20 blur-2xl" />
+                  <div className="relative flex items-start gap-4">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-rose-100">
+                      <AlertTriangle className="h-5 w-5 text-rose-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-rose-900">Legal Requirement — India</p>
+                      <p className="mt-1 text-xs leading-relaxed text-rose-700/80">
+                        Under Rule 14, Registration of Foreigners Rules 1992 and Hotel and Lodging Houses Act, every hotel must maintain a guest register and submit to local police within 24 hours of check-in. Foreign nationals are mandatory within 24 hours per Foreigners Act 1946.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
+                {/* Controls */}
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-slate-100">
                     <Calendar className="h-4 w-4 text-slate-400" />
-                    <input
-                      type="date"
-                      value={pStart}
-                      onChange={(e) => setPStart(e.target.value)}
-                      className="bg-transparent text-sm outline-none"
-                    />
-                    <span className="text-xs text-slate-300">|</span>
-                    <input
-                      type="date"
-                      value={pEnd}
-                      onChange={(e) => setPEnd(e.target.value)}
-                      className="bg-transparent text-sm outline-none"
-                    />
+                    <input type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} className="bg-transparent text-sm font-medium text-slate-700 outline-none" />
+                    <span className="text-xs text-slate-300">to</span>
+                    <input type="date" value={pEnd} onChange={(e) => setPEnd(e.target.value)} className="bg-transparent text-sm font-medium text-slate-700 outline-none" />
                   </div>
 
-                  <div className="flex min-w-[180px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                    <Search className="h-3.5 w-3.5 text-slate-400" />
+                  <div className="flex items-center gap-1">
+                    {[
+                      { label: 'Today', start: today, end: today },
+                      { label: 'This Month', start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], end: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0] },
+                      { label: 'This Year', start: `${new Date().getFullYear()}-01-01`, end: `${new Date().getFullYear()}-12-31` },
+                    ].map((range) => (
+                      <button
+                        key={range.label}
+                        onClick={() => setPoliceRange(range.start, range.end)}
+                        className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm ring-1 ring-slate-100 transition-all hover:bg-slate-50 active:scale-95"
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-2xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-slate-100">
+                    <Search className="h-4 w-4 text-slate-400" />
                     <input
                       type="text"
                       placeholder="Search name, ID, room..."
                       value={pSearch}
                       onChange={(e) => setPSearch(e.target.value)}
-                      className="flex-1 bg-transparent text-sm outline-none"
+                      className="flex-1 bg-transparent text-sm font-medium text-slate-700 outline-none placeholder:text-slate-400"
                     />
+                    {pSearch && (
+                      <button onClick={() => setPSearch('')} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
+                    )}
                   </div>
 
                   <button
                     onClick={exportCSV}
-                    className="flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700"
+                    className="flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-200 transition-all hover:bg-emerald-600 active:scale-95"
                   >
-                    <Download className="h-3.5 w-3.5" />
+                    <Download className="h-4 w-4" />
                     Export CSV
                   </button>
 
                   <button
-                    onClick={() =>
-                      doPrint({
-                        records: filtered,
-                        start: pStart,
-                        end: pEnd,
-                        hotel: hotelMeta,
-                      })
-                    }
-                    className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700"
+                    onClick={() => doPrint({ records: filtered, start: pStart, end: pEnd, hotel: hotelMeta })}
+                    className="flex items-center gap-2 rounded-2xl bg-rose-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-rose-200 transition-all hover:bg-rose-600 active:scale-95"
                   >
-                    <Printer className="h-3.5 w-3.5" />
-                    Print Register
+                    <Printer className="h-4 w-4" />
+                    Print
                   </button>
                 </div>
 
-                {police && (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {[
-                      { l: 'Total Check-ins', v: police.total, k: 'blue' as ColorKey },
-                      { l: 'ID Verified', v: police.records?.filter((r: any) => r.idVerified).length ?? 0, k: 'green' as ColorKey },
-                      { l: 'ID Pending', v: police.records?.filter((r: any) => !r.idVerified).length ?? 0, k: 'red' as ColorKey },
-                      {
-                        l: 'Foreign Nationals',
-                        v: police.records?.filter((r: any) => r.nationality !== 'Indian').length ?? 0,
-                        k: 'amber' as ColorKey,
-                      },
-                    ].map((s) => (
-                      <motion.div key={s.l} variants={fadeUp} className={`${COLOR_SETS[s.k].bg} rounded-2xl border border-white/60 p-4`}>
-                        <p className={`text-2xl font-bold leading-none ${COLOR_SETS[s.k].text}`}>{s.v}</p>
-                        <p className="mt-1.5 text-xs font-semibold text-slate-500">{s.l}</p>
-                      </motion.div>
-                    ))}
+                {police?.period && (
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
+                    <Filter className="h-3 w-3" />
+                    {police.period.start} → {police.period.end}
+                    {police?.total !== undefined && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600"> {police.total} records</span>}
                   </div>
                 )}
 
-                <Card>
-                  <CardHeader>
+                {/* Summary Stats */}
+                {police && (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    {[
+                      { l: 'Total', v: police?.total ?? 0, color: 'blue', icon: Users },
+                      { l: 'Verified', v: police.records?.filter((r: any) => r.idVerified).length ?? 0, color: 'green', icon: CheckCircle2 },
+                      { l: 'Pending', v: police.records?.filter((r: any) => !r.idVerified).length ?? 0, color: 'rose', icon: AlertTriangle },
+                      { l: 'Foreign', v: police.records?.filter((r: any) => r.nationality !== 'Indian').length ?? 0, color: 'amber', icon: Globe },
+                    ].map((s) => {
+                      const theme = getTheme(s.color);
+                      return (
+                        <motion.div
+                          key={s.l}
+                          variants={fadeUp}
+                          whileHover={{ y: -2 }}
+                          className={cn('flex items-center gap-4 rounded-2xl border p-5', theme.bg, theme.border)}
+                        >
+                          <div className={cn('flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm')}>
+                            <s.icon className={cn('h-6 w-6', theme.icon)} />
+                          </div>
+                          <div>
+                            <p className={cn('text-2xl font-bold', theme.text)}>{s.v}</p>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{s.l}</p>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Table */}
+                <Card className="overflow-hidden border-0 shadow-[0_2px_20px_-4px_rgba(0,0,0,0.05)]">
+                  <CardHeader className="flex items-center justify-between border-b border-slate-50 px-6 py-5">
                     <div>
                       <h3 className="font-semibold text-slate-900">Guest Register — Form C</h3>
                       <p className="mt-0.5 text-xs text-slate-400">Registration of Foreigners Rules, 1992</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {police && <span className="text-xs font-medium text-slate-500">{filtered.length} records</span>}
+                      {police && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{filtered.length} records</span>}
                       {filtered.some((r: any) => !r.idVerified) && (
-                        <Badge variant="danger">
-                          <AlertTriangle className="mr-1 h-3 w-3" />
+                        <Badge variant="danger"> 
+                          <AlertTriangle className="h-3 w-3" />
                           {filtered.filter((r: any) => !r.idVerified).length} unverified
                         </Badge>
                       )}
@@ -1436,101 +1457,85 @@ export default function ReportsPage() {
                   </CardHeader>
 
                   {policeLoad ? (
-                    <div className="flex justify-center py-12">
+                    <div className="flex justify-center py-16">
                       <Spinner />
                     </div>
                   ) : !filtered.length ? (
-                    <div className="py-14 text-center">
-                      <FileText className="mx-auto mb-3 h-10 w-10 text-slate-200" />
+                    <div className="py-16 text-center">
+                      <FileText className="mx-auto mb-4 h-12 w-12 text-slate-200" />
                       <p className="font-medium text-slate-500">No check-ins in selected period</p>
                       <p className="mt-1 text-sm text-slate-400">Select a date range with actual check-ins</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
+                      <table className="w-full text-sm">
                         <thead>
-                          <tr>
-                            {[
-                              '#',
-                              'Guest Name',
-                              'DOB',
-                              'Gender',
-                              'Nationality',
-                              'ID Type',
-                              'ID Number',
-                              'Phone',
-                              'Address',
-                              'Room',
-                              'Check-in',
-                              'Check-out',
-                              'Purpose',
-                              'ID Status',
-                            ].map((h) => (
-                              <th
-                                key={h}
-                                className="whitespace-nowrap border-b border-gray-200 bg-gray-50 px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-500"
-                              >
-                                {h}
-                              </th>
+                          <tr className="bg-slate-50/80">
+                            {['#','Guest Name','DOB','Gender','Nationality','ID Type','ID Number','Phone','Address','Room','Check-in','Check-out','Purpose','Status','ID Status'].map((h) => (
+                              <th key={h} className="whitespace-nowrap px-4 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">{h}</th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-50">
                           {filtered.map((r: any, i: number) => (
                             <motion.tr
                               key={r.reservationId}
-                              initial={{ opacity: 0, x: -6 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: Math.min(i * 0.025, 0.4) }}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: Math.min(i * 0.02, 0.5) }}
                               className={cn(
-                                'border-b border-slate-100 transition-colors hover:bg-slate-50',
-                                !r.idVerified && 'bg-red-50/30',
+                                'group transition-colors hover:bg-sky-50/20',
+                                !r.idVerified && 'bg-rose-50/20'
                               )}
                             >
-                              <td className="px-3 py-2.5 font-mono text-slate-400">{i + 1}</td>
-                              <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-slate-900">{r.guestName}</td>
-                              <td className="whitespace-nowrap px-3 py-2.5 font-mono text-slate-600">{r.dob || '—'}</td>
-                              <td className="px-3 py-2.5 capitalize text-slate-600">{r.gender || '—'}</td>
-                              <td className="px-3 py-2.5">
-                                <span
-                                  className={cn(
-                                    'whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                                    r.nationality === 'Indian' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700',
-                                  )}
-                                >
+                              <td className="px-4 py-3.5 font-mono text-xs text-slate-400">{i + 1}</td>
+                              <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-slate-900">{r.guestName}</td>
+                              <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs text-slate-500">{r.dob || '—'}</td>
+                              <td className="px-4 py-3.5 capitalize text-slate-600">{r.gender || '—'}</td>
+                              <td className="px-4 py-3.5">
+                                <span className={cn(
+                                  'whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold',
+                                  r.nationality === 'Indian' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100' : 'bg-sky-50 text-sky-700 ring-1 ring-sky-100'
+                                )}>
                                   {r.nationality}
                                 </span>
                               </td>
-                              <td className="whitespace-nowrap px-3 py-2.5 capitalize text-slate-600">
-                                {(r.idType || '—').replace('_', ' ')}
+                              <td className="whitespace-nowrap px-4 py-3.5 text-xs font-medium text-slate-600">{(r.idType || '—').replace('_', ' ')}</td>
+                              <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs text-slate-700">{r.idNumber || '—'}</td>
+                              <td className="px-4 py-3.5 font-mono text-xs text-slate-500">{r.phone}</td>
+                              <td className="px-4 py-3.5 text-xs text-slate-600">
+                                <div className="max-w-[240px] whitespace-normal break-words leading-relaxed">{r.address || '—'}</div>
                               </td>
-                              <td className="whitespace-nowrap px-3 py-2.5 font-mono text-slate-700">{r.idNumber || '—'}</td>
-                              <td className="px-3 py-2.5 font-mono text-slate-600">{r.phone}</td>
-                              <td className="px-3 py-2.5 text-gray-600 min-w-[220px]">
-                                <div className="max-w-[260px] whitespace-normal break-words leading-relaxed">
-                                  {r.address || '—'}
-                                </div>
+                              <td className="px-4 py-3.5">
+                                <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{r.roomNumber}</span>
                               </td>
-                              <td className="px-3 py-2.5">
-                                <span className="rounded-lg bg-slate-100 px-2 py-0.5 font-bold text-slate-900">{r.roomNumber}</span>
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
-                                <span className="block">{r.checkIn}</span>
+                              <td className="whitespace-nowrap px-4 py-3.5">
+                                <span className="block text-xs font-medium text-slate-700">{r.checkIn}</span>
                                 <span className="font-mono text-[10px] text-slate-400">{r.checkInTime}</span>
                               </td>
-                              <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
-                                {r.checkOut || <span className="text-[10px] font-medium text-green-600">In-house</span>}
+                              <td className="whitespace-nowrap px-4 py-3.5">
+                                {r.checkOut || <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600">In-house</span>}
                               </td>
-                              <td className="px-3 py-2.5 capitalize text-slate-600">{r.purposeOfVisit || 'Leisure'}</td>
-                              <td className="px-3 py-2.5">
+                              <td className="px-4 py-3.5 text-xs capitalize text-slate-600">{r.purposeOfVisit || 'Leisure'}</td>
+                              <td className="whitespace-nowrap px-4 py-3.5">
+                                <span className={cn(
+                                  'rounded-full px-2.5 py-1 text-[10px] font-bold uppercase',
+                                  r.status === 'checked_in' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100' :
+                                  r.status === 'checked_out' ? 'bg-slate-50 text-slate-700 ring-1 ring-slate-100' :
+                                  'bg-amber-50 text-amber-700 ring-1 ring-amber-100'
+                                )}>
+                                  {r.status?.replace('_', ' ') || '—'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3.5">
                                 {r.idVerified ? (
-                                  <span className="flex items-center gap-1 whitespace-nowrap font-semibold text-green-700">
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-emerald-600">
+                                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
                                     Verified
                                   </span>
                                 ) : (
-                                  <span className="flex items-center gap-1 whitespace-nowrap font-semibold text-red-600">
-                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-rose-600">
+                                    <div className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
                                     Pending
                                   </span>
                                 )}
@@ -1544,8 +1549,8 @@ export default function ReportsPage() {
                 </Card>
 
                 {filtered.length > 0 && (
-                  <p className="text-center text-xs text-slate-400">
-                    Compliant with Hotel & Lodging Houses Act, India. Export CSV or print for police submission. Foreign nationals must be reported within 24 hours.
+                  <p className="text-center text-xs font-medium text-slate-400">
+                    Compliant with Hotel & Lodging Houses Act, India. Export CSV or print for police submission.
                   </p>
                 )}
               </motion.div>
@@ -1554,5 +1559,18 @@ export default function ReportsPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+// ── Helper Components ─────────────────────────────────────────────────────────
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-3xl bg-white py-20 shadow-sm ring-1 ring-slate-100">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50">
+        <FileText className="h-8 w-8 text-slate-300" />
+      </div>
+      <p className="text-sm font-semibold text-slate-500">{message}</p>
+    </div>
   );
 }
