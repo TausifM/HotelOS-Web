@@ -82,8 +82,11 @@ export default function LoginPage() {
       );
 
       const meRes = await api.get('/api/auth/me', {
-        withCredentials: true,
-      });
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
+    });
 
       const session = meRes.data?.data;
 
