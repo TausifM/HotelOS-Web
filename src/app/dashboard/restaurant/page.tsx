@@ -73,7 +73,28 @@ export default function Index() {
     staleTime: 60_000,
   });
 
-  /* ─── Mutations ────────────────────────────────────────────────────────── */
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: Order["status"] }) =>
+      api.patch(`/api/restaurant/orders/${id}/status`, { status }),
+    onSuccess: (_, { status }) => {
+      toast.success(`Order marked as ${status}`);
+      qc.invalidateQueries({ queryKey: ["restaurant-orders"] });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to update status"),
+  });
+
+  // ── 1. saveMenuMutation — remove generic onSuccess (it causes double toast) ──
+  const saveMenuMutation = useMutation({
+    mutationFn: (items: MenuItem[]) =>
+      api.put("/api/restaurant/menu", { items }),
+    onSuccess: () => {
+      // NO generic toast here — each call site handles its own message
+      qc.invalidateQueries({ queryKey: ["restaurant-menu"] });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to save menu"),
+  });
+
+  // ── 2. placeOrderMutation — reset ALL modal state on success ─────────────────
   const placeOrderMutation = useMutation({
     mutationFn: (payload: {
       items: { name: string; price: number; quantity: number }[];
@@ -88,45 +109,91 @@ export default function Index() {
     onSuccess: () => {
       toast.success("Order placed successfully!");
       qc.invalidateQueries({ queryKey: ["restaurant-orders"] });
+      // Reset ALL modal state — previously orderType/selectedRoomId/guest were NOT reset
       setShowOrderModal(false);
       setSelectedItems([]);
       setRoomNumber("");
       setTableNumber("");
       setDineInGuestPhone("");
+      setOrderType("room_service");       // ← was missing
+      setSelectedRoomId("");              // ← was missing
+      setSelectedRoomNumber("");          // ← was missing
+      setSelectedGuest(null);            // ← was missing
+      setSelectedReservation(null);      // ← was missing
     },
     onError: (e: any) =>
       toast.error(e?.response?.data?.message ?? "Failed to place order"),
   });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: Order["status"] }) =>
-      api.patch(`/api/restaurant/orders/${id}/status`, { status }),
-    onSuccess: (_, { status }) => {
-      toast.success(`Order marked as ${status}`);
-      qc.invalidateQueries({ queryKey: ["restaurant-orders"] });
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to update status"),
-  });
-
-  const saveMenuMutation = useMutation({
-    mutationFn: (items: MenuItem[]) =>
-      api.put("/api/restaurant/menu", { items }),
-    onSuccess: () => {
-      toast.success("Menu saved");
-      qc.invalidateQueries({ queryKey: ["restaurant-menu"] });
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to save menu"),
-  });
-
   const deleteItemMutation = useMutation({
-    mutationFn: (itemId: string) =>
-      api.delete(`/api/restaurant/menu/items/${itemId}`),
+    mutationFn: async (id: string) => {
+      return api.delete(`/api/restaurant/menu/items/${id}`);
+    },
+
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ["restaurant-menu"] });
+
+      const previousMenu =
+        qc.getQueryData<MenuItem[]>(["restaurant-menu"]) || [];
+
+      // Optimistic update
+      qc.setQueryData<MenuItem[]>(
+        ["restaurant-menu"],
+        previousMenu.filter((item) => item.id !== id)
+      );
+
+      return { previousMenu };
+    },
+
+    onError: (error: any, _id, context) => {
+      if (context?.previousMenu) {
+        qc.setQueryData(["restaurant-menu"], context.previousMenu);
+      }
+
+      toast.error(
+        error?.response?.data?.message || "Failed to delete item"
+      );
+    },
+
     onSuccess: () => {
-      toast.success("Item removed");
+      toast.success("Menu item deleted");
+    },
+
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["restaurant-menu"] });
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Failed to delete item"),
   });
+  // ── 3. toggleAvailability — fix stale closure ─────────────────────────────────
+  // OLD: used `menuItems` from render closure — stale if a refetch was in flight
+  // NEW: reads fresh data from the cache at mutation time
+  function toggleAvailability(id: string) {
+    const current = qc.getQueryData<MenuItem[]>(["restaurant-menu"]) ?? [];
+    const updated = current.map((i) =>
+      i.id === id ? { ...i, isAvailable: !i.isAvailable } : i
+    );
+    qc.setQueryData(["restaurant-menu"], updated); // optimistic
+    saveMenuMutation.mutate(updated, {
+      onError: () => {
+        // Roll back optimistic update on failure
+        qc.setQueryData(["restaurant-menu"], current);
+      },
+    });
+  }
+
+  // ── 5. saveEditItem — fix stale closure ──────────────────────────────────────
+  function saveEditItem() {
+    if (!editingItem) return;
+    const current = qc.getQueryData<MenuItem[]>(["restaurant-menu"]) ?? [];
+    const updated = current.map((i) =>
+      i.id === editingItem.id ? { ...formData, id: editingItem.id } : i
+    );
+    saveMenuMutation.mutate(updated, {
+      onSuccess: () => {
+        closeItemDialog();
+        toast.success("Item updated");
+      },
+    });
+  }
+
 
   /* ─── Local UI state (no data here) ───────────────────────────────────── */
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -167,6 +234,7 @@ export default function Index() {
   const [selectedGuest, setSelectedGuest] = useState<any>(null);
   const [selectedReservation, setSelectedReservation] = useState<any>(null);
   const [guestLoading, setGuestLoading] = useState(false);
+
   async function downloadInvoice(orderId: string) {
     setDownloadingInvoice(true);
     try {
@@ -312,47 +380,8 @@ export default function Index() {
     });
   }
 
-  function placeOrder() {
-    if (!selectedItems.length) return;
-
-    placeOrderMutation.mutate({
-      items: selectedItems.map((i) => ({
-        name: i.name,
-        price: i.price,
-        quantity: i.quantity,
-      })),
-      orderType,
-      roomNumber: orderType === "room_service" ? roomNumber : undefined,
-      tableNumber: orderType === "dine_in" ? tableNumber.trim() : undefined,
-      reservationId:
-        orderType === "room_service"
-          ? selectedReservation?._id || selectedReservation?.id
-          : undefined,
-      guestId:
-        orderType === "room_service"
-          ? selectedGuest?._id || selectedGuest?.id
-          : undefined,
-      guestPhone:
-        orderType === "dine_in" && dineInGuestPhone.trim()
-          ? dineInGuestPhone.trim()
-          : undefined,
-      total,
-    });
-  }
-
   function updateStatus(id: string, status: Order["status"]) {
     updateStatusMutation.mutate({ id, status });
-  }
-
-  /* ─── Menu handlers ────────────────────────────────────────────────────── */
-  // Toggle availability: optimistic local + full PUT to backend
-  function toggleAvailability(id: string) {
-    const updated = menuItems.map((i) =>
-      i.id === id ? { ...i, isAvailable: !i.isAvailable } : i
-    );
-    // Optimistic via React Query cache
-    qc.setQueryData(["restaurant-menu"], updated);
-    saveMenuMutation.mutate(updated);
   }
 
   function deleteMenuItem(id: string) {
@@ -360,18 +389,6 @@ export default function Index() {
     deleteItemMutation.mutate(id);
   }
 
-  function saveEditItem() {
-    if (!editingItem) return;
-    const updated = menuItems.map((i) =>
-      i.id === editingItem.id ? { ...formData, id: editingItem.id } : i
-    );
-    saveMenuMutation.mutate(updated, {
-      onSuccess: () => {
-        closeItemDialog();
-        toast.success("Item updated");
-      },
-    });
-  }
   const loadGuestByRoom = async (room: any) => {
     if (!room) {
       setSelectedGuest(null);
@@ -421,6 +438,7 @@ export default function Index() {
       setGuestLoading(false);
     }
   };
+
   function addNewItem() {
     if (!formData.name.trim() || !formData.price) {
       toast.error("Name and price required");
@@ -433,8 +451,10 @@ export default function Index() {
       price: Number(formData.price),
     };
 
+    const current = qc.getQueryData<MenuItem[]>(["restaurant-menu"]) ?? [];
+
     saveMenuMutation.mutate(
-      [item, ...menuItems],
+      [item, ...current],
       {
         onSuccess: () => {
           closeItemDialog();
@@ -442,6 +462,37 @@ export default function Index() {
         },
       }
     );
+  }
+
+  // ── 7. placeOrder — make tableNumber optional for dine_in ────────────────────
+  function placeOrder() {
+    if (!selectedItems.length) return;
+
+    placeOrderMutation.mutate({
+      items: selectedItems.map((i) => ({
+        name: i.name,
+        price: i.price,
+        quantity: i.quantity,
+      })),
+      orderType,
+      roomNumber: orderType === "room_service" ? roomNumber : undefined,
+      tableNumber: orderType === "dine_in" && tableNumber.trim()
+        ? tableNumber.trim()
+        : undefined,
+      reservationId:
+        orderType === "room_service"
+          ? selectedReservation?._id || selectedReservation?.id
+          : undefined,
+      guestId:
+        orderType === "room_service"
+          ? selectedGuest?._id || selectedGuest?.id
+          : undefined,
+      guestPhone:
+        orderType === "dine_in" && dineInGuestPhone.trim()
+          ? dineInGuestPhone.trim()
+          : undefined,
+      total,
+    });
   }
 
   /* ─── Stats ────────────────────────────────────────────────────────────── */
@@ -1533,10 +1584,16 @@ export default function Index() {
             </div>
 
             {/* ── FOOTER ── */}
-            <div
-              className="flex-shrink-0 border-t px-4 sm:px-6 py-3 sm:py-4"
-              style={{ borderColor: "#f1f5f9", background: "#ffffff" }}
-            >
+            <div className="flex-shrink-0 border-t px-4 sm:px-6 py-3 sm:py-4"
+              style={{ borderColor: "#f1f5f9", background: "#ffffff" }}>
+
+              {/* Hint — shown when items are selected but room is missing for room_service */}
+              {selectedItems.length > 0 && orderType === "room_service" && !roomNumber && (
+                <p className="mb-2 text-center text-xs font-medium text-orange-500">
+                  Please select a room to place the order
+                </p>
+              )}
+
               <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
                 <button
                   type="button"
@@ -1552,7 +1609,9 @@ export default function Index() {
                   disabled={
                     placeOrderMutation.isPending ||
                     !selectedItems.length ||
-                    (orderType === "room_service" ? !roomNumber : !tableNumber.trim())
+                    // For room_service, roomNumber is required
+                    // For dine_in, tableNumber is OPTIONAL — never block the order
+                    (orderType === "room_service" && !roomNumber)
                   }
                   className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{
@@ -1560,9 +1619,11 @@ export default function Index() {
                     boxShadow: selectedItems.length ? "0 4px 14px rgba(249,115,22,0.4)" : "none",
                   }}
                 >
-                  {selectedItems.length
-                    ? `Place Order · ₹${total}`
-                    : 'Select items to order'}
+                  {placeOrderMutation.isPending
+                    ? "Placing order..."
+                    : selectedItems.length
+                      ? `Place Order · ₹${total}`
+                      : "Select items to order"}
                 </button>
               </div>
             </div>
@@ -2306,9 +2367,8 @@ export default function Index() {
                   { key: 'isPopular' as const, label: 'Best Seller', desc: 'Show trending badge', icon: '🔥' },
                   { key: 'isChefSpecial' as const, label: "Chef's Pick", desc: 'Show chef special badge', icon: '👨‍🍳' },
                 ].map((opt) => (
-                  <button
+                  <div
                     key={opt.key}
-                    type="button"
                     onClick={() => patchForm({ [opt.key]: !formData[opt.key] })}
                     className="flex items-center justify-between rounded-2xl p-3 text-left transition-all"
                     style={{
@@ -2325,7 +2385,7 @@ export default function Index() {
                       onCheckedChange={(v) => patchForm({ [opt.key]: v })}
                       className="data-[state=checked]:bg-primary"
                     />
-                  </button>
+                  </div>
                 ))}
               </div>
               {/* Available */}
