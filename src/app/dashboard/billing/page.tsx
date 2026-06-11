@@ -2382,7 +2382,7 @@ function SettledGuestsTable() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full h-full min-w-max table-fixed">
+            <table className="w-full h-full min-w-max">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80">
                   <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-widest text-slate-500">Folio</th>
