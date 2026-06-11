@@ -340,22 +340,23 @@ export default function ReservationsPage() {
               </Link>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border border-orange-100/60 shadow-sm">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{ background: '#fafafa' }}>
+                  <tr style={{ background: 'linear-gradient(135deg, #fff7f0 0%, #fff0f6 100%)' }}>
                     {[
                       'Guest', 'Booking Ref', 'Room', 'Check-in', 'Check-out',
                       'Nights', 'Days Staying', 'Meal Plan', 'Amount', 'Payment', 'Status',
                     ].map(h => (
                       <th key={h}
-                        className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 border-b border-gray-100 whitespace-nowrap">
+                        className="text-left text-xs font-semibold uppercase tracking-wider px-4 py-3.5 border-b border-orange-100/80 whitespace-nowrap"
+                        style={{ color: '#c2410c' }}>
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-orange-50">
                   {data.docs.map((r: any) => {
                     const stay = getDaysStaying(r);
                     const mealLabel = MEAL_PLAN_LABELS[r.mealPlan] || r.mealPlan?.toUpperCase() || '—';
@@ -363,30 +364,45 @@ export default function ReservationsPage() {
                     const loyaltyTier = r.guestId?.loyalty?.tier || 'bronze';
                     const loyaltyColor = LOYALTY_COLORS[loyaltyTier] || LOYALTY_COLORS.bronze;
 
-                    // Payment display
                     const isPaid    = r.paymentStatus === 'paid';
                     const isPartial = r.paymentStatus === 'partial';
                     const balanceDue = r.balanceDue ?? r.folioId?.balance ?? 0;
 
+                    // Pick a gradient per guest initial for variety
+                    const gradients = [
+                      'linear-gradient(135deg, #f97316, #ec4899)',
+                      'linear-gradient(135deg, #fb923c, #f43f5e)',
+                      'linear-gradient(135deg, #f59e0b, #ef4444)',
+                      'linear-gradient(135deg, #e879f9, #f97316)',
+                      'linear-gradient(135deg, #a78bfa, #ec4899)',
+                    ];
+                    const gradientIndex = (r.guestId?.firstName?.charCodeAt(0) || 0) % gradients.length;
+
                     return (
                       <tr key={r._id}
                         onClick={() => router.push(`/dashboard/reservations/${r._id}`)}
-                        className="hover:bg-orange-50/30 cursor-pointer transition-colors group">
+                        className="cursor-pointer transition-all duration-150 group"
+                        style={{ background: 'white' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'linear-gradient(135deg, #fff7f0 0%, #fff0f6 100%)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
 
                         {/* Guest */}
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                              style={{ background: 'linear-gradient(135deg,#c2410c,#9f1239)' }}>
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm"
+                              style={{ background: gradients[gradientIndex] }}>
                               {r.guestId?.firstName?.[0]}
                             </div>
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <p className="text-sm font-semibold text-gray-900">
+                                <p className="text-sm font-semibold text-gray-800">
                                   {r.guestId?.firstName} {r.guestId?.lastName}
                                 </p>
                                 {r.guestId?.isVip && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-700">VIP</span>
+                                  <span className="text-xs px-1.5 py-0.5 rounded font-bold"
+                                    style={{ background: 'linear-gradient(135deg, #fef3c7, #fde68a)', color: '#92400e' }}>
+                                    VIP
+                                  </span>
                                 )}
                               </div>
                               <div className="flex items-center gap-1.5 mt-0.5">
@@ -401,7 +417,8 @@ export default function ReservationsPage() {
 
                         {/* Booking Ref */}
                         <td className="px-4 py-3.5">
-                          <span className="font-mono text-xs px-2 py-1 rounded-lg font-semibold bg-slate-100 text-slate-500">
+                          <span className="font-mono text-xs px-2.5 py-1 rounded-lg font-semibold"
+                            style={{ background: 'linear-gradient(135deg, #fff1f2, #fce7f3)', color: '#be185d' }}>
                             {r.bookingRef}
                           </span>
                         </td>
@@ -413,26 +430,31 @@ export default function ReservationsPage() {
                         </td>
 
                         {/* Check-in */}
-                        <td className="px-4 py-3.5 text-sm text-gray-600 whitespace-nowrap">
-                          {formatDate(r.checkIn)}
+                        <td className="px-4 py-3.5">
+                          <span className="text-sm text-gray-600 whitespace-nowrap bg-orange-50 px-2 py-0.5 rounded-md">
+                            {formatDate(r.checkIn)}
+                          </span>
                         </td>
 
                         {/* Check-out */}
-                        <td className="px-4 py-3.5 text-sm text-gray-600 whitespace-nowrap">
-                          {formatDate(r.checkOut)}
+                        <td className="px-4 py-3.5">
+                          <span className="text-sm text-gray-600 whitespace-nowrap bg-pink-50 px-2 py-0.5 rounded-md">
+                            {formatDate(r.checkOut)}
+                          </span>
                         </td>
 
                         {/* Nights */}
                         <td className="px-4 py-3.5">
-                          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+                            style={{ background: 'linear-gradient(135deg, #fff7ed, #fce7f3)', color: '#c2410c' }}>
                             <Moon className="w-3 h-3" /> {r.nights}N
                           </span>
                         </td>
 
-                        {/* Days Staying ── NEW */}
+                        {/* Days Staying */}
                         <td className="px-4 py-3.5">
                           <span className={cn(
-                            'inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full whitespace-nowrap',
+                            'inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full whitespace-nowrap text-red-500',
                             stay.colorClass,
                           )}>
                             {stay.icon}
@@ -440,40 +462,47 @@ export default function ReservationsPage() {
                           </span>
                         </td>
 
-                        {/* Meal Plan ── NEW */}
+                        {/* Meal Plan */}
                         <td className="px-4 py-3.5">
-                          <span className={cn('text-xs font-bold px-2 py-1 rounded font-mono', mealColor)}>
+                          <span className={cn('text-xs font-bold px-2.5 py-1 rounded-lg font-mono', mealColor)}>
                             {mealLabel}
                           </span>
                         </td>
 
                         {/* Amount */}
                         <td className="px-4 py-3.5">
-                          <p className="text-sm font-bold text-gray-900">{formatCurrency(r.totalAmount)}</p>
+                          <p className="text-sm font-bold text-green-900">{formatCurrency(r.totalAmount)}</p>
                           {r.advancePaid > 0 && (
-                            <p className="text-xs text-gray-400">Adv: {formatCurrency(r.advancePaid)}</p>
+                            <p className="text-xs mt-0.5 font-medium"
+                              style={{ color: '#16a34a' }}>
+                              Adv: {formatCurrency(r.advancePaid)}
+                            </p>
                           )}
                         </td>
 
-                        {/* Payment ── NEW */}
+                        {/* Payment */}
                         <td className="px-4 py-3.5">
                           {isPaid ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-green-50 text-green-700">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                              style={{ background: 'linear-gradient(135deg, #dcfce7, #d1fae5)', color: '#15803d' }}>
                               <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
                               Paid
                             </span>
                           ) : isPartial ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-sky-50 text-sky-700">
-                              <span className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                              style={{ background: 'linear-gradient(135deg, #e0f2fe, #dbeafe)', color: '#1d4ed8' }}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
                               Partial
                             </span>
                           ) : balanceDue > 0 ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-red-50 text-red-600">
-                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                              style={{ background: 'linear-gradient(135deg, #fff1f2, #ffe4e6)', color: '#be123c' }}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
                               ₹{balanceDue.toLocaleString('en-IN')} due
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                              style={{ background: 'linear-gradient(135deg, #fff7ed, #fef3c7)', color: '#b45309' }}>
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
                               Pending
                             </span>
@@ -483,7 +512,7 @@ export default function ReservationsPage() {
                         {/* Status */}
                         <td className="px-4 py-3.5 w-16 text-center">
                           <span className={cn(
-                            'px-2 py-1 rounded-full text-xs font-semibold capitalize',
+                            'px-2.5 py-1 rounded-full text-xs font-semibold capitalize',
                             RESERVATION_STATUS_COLORS[r.status] || 'bg-gray-100 text-gray-600',
                           )}>
                             {r.status?.replace('_', ' ')}
