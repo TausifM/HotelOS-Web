@@ -74,6 +74,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       { href: "/dashboard/audit", label: "Audit Logs", icon: ClipboardList, permission: "audits.read" },
       { href: "/dashboard/attendance", label: "Staff Attendance", icon: CalendarDays, permission: "attendance.read", badge: "NEW" },
       { href: "/dashboard/guest-operations", label: "Guest Chat", icon: CalendarDays, permission: "attendance.read", badge: "AI"},
+      { href: "/dashboard/guest-chat-history", label: "Guest Chat History", icon: CalendarDays, permission: "attendance.read", badge: "AI"},
     ],
   },
   {
