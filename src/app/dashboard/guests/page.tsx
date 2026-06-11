@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Spinner } from '@/components/ui';
@@ -10,6 +10,7 @@ import {
   Plus, Search, Star, ShieldCheck, Users, Phone,
   Calendar, ChevronLeft, ChevronRight, AlertCircle,
   UserPlus, Crown, ArrowUpRight,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -74,6 +75,7 @@ export default function GuestsPage() {
   const [search, setSearch] = useState('');
   const [tier, setTier] = useState('');
   const [page, setPage] = useState(1);
+  const qc = useQueryClient();
 
   const { data, isLoading } = useQuery<GuestsResponse>({
     queryKey: ['guests', search, tier, page],
@@ -86,6 +88,13 @@ export default function GuestsPage() {
     placeholderData: p => p,
   });
 
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ['guests'] });
+  };
+  
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ['guests'] });
+  }, []);
   return (
     <DashboardLayout title="Guests">
       <div className="space-y-5 pb-10">
@@ -160,6 +169,19 @@ export default function GuestsPage() {
                   <span className="text-sm font-bold whitespace-nowrap">New Guest</span>
                 </div>
               </Link>
+
+              <div
+                onClick={refreshAll}
+                className="flex items-center gap-2 rounded-2xl px-4 py-2.5 cursor-pointer transition-all hover:opacity-90 active:scale-95"
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                }}
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="text-sm font-bold">Refresh</span>
+              </div>
             </div>
           </div>
         </div>

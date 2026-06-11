@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageLoader } from '@/components/ui';
@@ -11,6 +11,7 @@ import {
   Plus, Search, Calendar, Home, LogIn, LogOut,
   ChevronLeft, ChevronRight, Bed, Moon, AlertTriangle,
   Clock, CheckCircle,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -109,6 +110,7 @@ export default function ReservationsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page,   setPage]   = useState(1);
+  const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['reservations', search, status, page],
@@ -134,7 +136,19 @@ export default function ReservationsPage() {
     queryFn: () => api.get('/api/reservations/in-house').then(r => r.data.data),
     staleTime: 60_000,
   });
-
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ['reservations'] });
+    qc.invalidateQueries({ queryKey: ['arrivals-today'] });
+    qc.invalidateQueries({ queryKey: ['departures-today'] });
+    qc.invalidateQueries({ queryKey: ['in-house'] });
+  };
+    // Reservations page
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ['reservations'] });
+    qc.invalidateQueries({ queryKey: ['arrivals-today'] });
+    qc.invalidateQueries({ queryKey: ['departures-today'] });
+    qc.invalidateQueries({ queryKey: ['in-house'] });
+  }, []);
   return (
     <DashboardLayout title="Reservations">
       <div className="space-y-5 max-w-7xl pb-10">
@@ -190,6 +204,14 @@ export default function ReservationsPage() {
                 <Plus className="w-4 h-4" /> New Reservation
               </button>
             </Link>
+
+            <button
+              onClick={refreshAll}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 active:scale-[0.98] flex-shrink-0"
+              style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)' }}
+            >
+              <RefreshCw className="w-4 h-4" /> Refresh
+            </button>
           </div>
         </div>
 

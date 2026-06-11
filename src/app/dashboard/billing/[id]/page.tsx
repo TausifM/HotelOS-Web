@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
@@ -356,6 +356,16 @@ export default function FolioDetailPage() {
   const balance = Number(summary?.balance ?? folio?.balance ?? 0);
   const isSettled = Boolean(summary?.isSettled ?? folio?.isSettled);
   const invoiceNo = summary?.gstInvoiceNo || folio?.gstInvoiceNo || null;
+
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ['folio', id] });
+    qc.invalidateQueries({ queryKey: ['folio-summary', id] });
+    qc.invalidateQueries({ queryKey: ['folio-timeline', id] });
+    qc.invalidateQueries({ queryKey: ['folio-invoice-preview', id] });
+    qc.invalidateQueries({ queryKey: ['folio-bottom-summary'] });
+    qc.invalidateQueries({ queryKey: ['reservations'] });
+    qc.invalidateQueries({ queryKey: ['reservation', folio?.reservationId?._id || folio?.reservationId] });
+  }, [id]);
 
   if (isLoading) {
     return (
