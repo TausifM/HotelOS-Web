@@ -79,8 +79,8 @@ export default function Footer() {
               {[
                 { icon: <TwitterIcon />, href: "#", label: "Twitter" },
                 { icon: <LinkedInIcon />, href: "#", label: "LinkedIn" },
-                { icon: <InstagramIcon />, href: "#", label: "Instagram" },
-                { icon: <YouTubeIcon />, href: "#", label: "YouTube" },
+                { icon: <InstagramIcon />, href: "https://www.instagram.com/hotelos.online", label: "Instagram" },
+                { icon: <YouTubeIcon />, href: "https://www.youtube.com/@HotelOS-No1", label: "YouTube" },
               ].map((social) => (
                 <a
                   key={social.label}
