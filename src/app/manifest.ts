@@ -2,8 +2,8 @@ import { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "HoteloS — India's Smartest Hotel Management Software",
-    short_name: "HoteloS",
+    name: "HotelOS — India's Smartest Hotel Management Software",
+    short_name: "HotelOS",
     description:
       "Manage your hotel with AI revenue intelligence, WhatsApp automation, channel manager & GST filing.",
     start_url: "/",

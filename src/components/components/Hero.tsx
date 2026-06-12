@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useInView } from "framer-motion";
-import { ArrowRight, Play, Zap } from "lucide-react";
+import { motion, useInView, AnimatePresence } from "framer-motion";
+import { ArrowRight, Play, Zap, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -31,6 +31,8 @@ function CountUp({ target, duration = 2000 }: { target: number; duration?: numbe
 }
 
 export default function Hero() {
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+
   return (
     <section
       id="home"
@@ -107,7 +109,10 @@ export default function Hero() {
                 Start 4-Month Free Trial
                 <ArrowRight className="w-5 h-5" />
               </Link>
-              <button className="flex items-center gap-2 px-6 py-3.5 rounded-xl border-2 border-[#111827] text-[#111827] font-bold text-base hover:bg-gray-50 transition-colors">
+              <button
+                onClick={() => setIsVideoOpen(true)}
+                className="flex items-center gap-2 px-6 py-3.5 rounded-xl border-2 border-[#111827] text-[#111827] font-bold text-base hover:bg-gray-50 transition-colors"
+              >
                 <div className="w-7 h-7 rounded-full bg-[#111827] flex items-center justify-center">
                   <Play className="w-3 h-3 fill-white text-white ml-0.5" />
                 </div>
@@ -185,6 +190,42 @@ export default function Hero() {
           </motion.div>
         </div>
       </div>
+
+      {/* Video Modal */}
+      <AnimatePresence>
+        {isVideoOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setIsVideoOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <iframe
+                src="https://www.youtube.com/embed/Ikz0PzMQaw8?autoplay=1&rel=0&modestbranding=1"
+                title="HotelOS Demo Video"
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+              <button
+                onClick={() => setIsVideoOpen(false)}
+                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md flex items-center justify-center text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
